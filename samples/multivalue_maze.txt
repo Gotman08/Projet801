@@ -1,0 +1,13 @@
+# Maze-like: 0=floor (black), 1=wall (white), 6=door (red)
+# Walls form corridors and rooms; doors break wall segments.
+1 1 1 1 1 1 1 1 1 1 1 1
+1 0 0 0 0 0 1 0 0 0 0 1
+1 0 1 1 0 0 1 0 1 1 0 1
+1 0 1 0 0 0 6 0 1 0 0 1
+1 0 1 0 1 1 1 1 1 0 1 1
+1 0 0 0 1 0 0 0 0 0 0 1
+1 1 6 1 1 0 1 1 1 0 1 1
+1 0 0 0 0 0 1 0 0 0 0 1
+1 0 1 1 1 0 6 0 1 1 0 1
+1 0 0 0 1 0 1 0 0 0 0 1
+1 1 1 1 1 1 1 1 1 1 1 1

@@ -1,0 +1,16 @@
+# Terrain: 0=water (blue), 3=sand (orange), 4=grass (green), 5=rock (purple)
+# Layered transitions: water->sand->grass->rock, sometimes patchy
+0 0 0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0 0 0
+0 0 0 3 3 0 0 0 0 0
+0 0 3 3 3 3 3 0 0 0
+0 3 3 4 4 4 3 3 0 0
+3 3 4 4 4 4 4 3 3 0
+3 4 4 4 5 4 4 4 3 3
+3 4 4 5 5 5 4 4 3 3
+3 3 4 4 5 4 4 3 3 0
+0 3 3 4 4 4 3 3 0 0
+0 0 3 3 3 3 3 0 0 0
+0 0 0 3 3 3 0 0 0 0
+0 0 0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0 0 0

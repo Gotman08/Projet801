@@ -1,0 +1,76 @@
+# Build directories
+build/
+build-*/
+out/
+cmake-build-*/
+
+# CMake artifacts
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+CTestTestfile.cmake
+*.cmake.in
+install_manifest.txt
+Testing/
+
+# Compiled objects, binaries, libraries
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.exp
+*.ilk
+*.pdb
+*.idb
+
+# IDE & editor
+.vscode/
+.vs/
+.idea/
+*.user
+*.suo
+.cache/
+.clangd/
+*.swp
+*.swo
+
+# Python (analysis scripts)
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# External dependencies (Kokkos build)
+external/
+
+# Benchmark outputs that shouldn't be committed
+results/romeo/romeo_*.err
+results/romeo/romeo_*.out
+results/romeo/romeo_smoke_*.err
+results/romeo/romeo_smoke_*.out
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Plan files (private to local Claude session)
+.claude/
+
+# Generated documentation
+docs/figures/**/*.aux
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.toc
