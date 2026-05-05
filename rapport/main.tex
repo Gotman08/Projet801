@@ -488,7 +488,7 @@ Ce rapport présente l'implémentation et l'optimisation de l'algorithme \textbf
 
 Nous développons d'abord une version séquentielle de référence basée sur trois primitives : extraction de tuiles toroïdale, compatibilité par bitsets packés sur \texttt{uint64\_t}, et propagation BFS niveau-synchrone. L'algorithme est ensuite parallélisé via \textbf{OpenMP} avec l'API \texttt{\#pragma omp task} explicite (sélection min-entropie chunked, propagation BFS multi-niveaux), puis porté sur \textbf{Kokkos} pour cibler les architectures CPU et GPU (CUDA) sans duplication de code. \\
 
-Les benchmarks sur le supercalculateur \textbf{Romeo} (AMD EPYC 9654, 192 cœurs, 8 nœuds NUMA) atteignent un speedup peak de \textbf{8.23×} à 16 threads sur grille 256×256. Trois extensions opt-in sont livrées et étudiées : symétries D4, backtracking avec snapshot delta-encodé, et exécution de K attempts WFC indépendants en parallèle. Une démonstration sur \textbf{Unreal Engine 5} ferme le projet. \\
+Les benchmarks sur le supercalculateur \textbf{Romeo} (AMD EPYC 9654, 192 cœurs, 8 nœuds NUMA) atteignent un speedup peak de \textbf{8.23×} à 16 threads sur grille 256×256. Trois extensions opt-in : symétries D4, backtracking avec snapshot delta-encodé, et exécution de K attempts WFC indépendants en parallèle. Une démonstration sur \textbf{Unreal Engine 5} ferme le projet. \\
 
 \textbf{Mots-clés :} Wave Function Collapse, génération procédurale, OpenMP \texttt{task}, Kokkos, GPU CUDA, déterminisme, calcul haute performance. \\
 
@@ -506,16 +506,6 @@ Benchmarks on the \textbf{Romeo} supercomputer (AMD EPYC 9654, 192 cores, 8 NUMA
 
 % === TABLE DES MATIÈRES ===
 \tableofcontents
-\clearpage
-
-% === LISTE DES FIGURES ===
-\listoffigures
-\addcontentsline{toc}{chapter}{Liste des figures}
-\clearpage
-
-% === LISTE DES TABLEAUX ===
-\listoftables
-\addcontentsline{toc}{chapter}{Liste des tableaux}
 \clearpage
 
 % =============================================================================

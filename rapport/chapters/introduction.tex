@@ -13,7 +13,7 @@ Le \textbf{Wave Function Collapse} (WFC) en modèle \textit{overlapping} \cite{g
 
 \subsection{Stratégie d'implémentation}
 
-Trois livrables incrémentaux :
+Trois cibles incrémentales :
 \begin{enumerate}
     \item \textbf{Solveur série} (\texttt{wfc\_serial}) : référence algorithmique, bitsets packés sur \texttt{uint64\_t}, BFS niveau-synchrone, jitter d'entropie déterministe SplitMix64.
     \item \textbf{Backend OpenMP} (\texttt{wfc\_omp}) : API \texttt{\#pragma omp task} explicite. Sélection min-entropie chunkée + réduction ordonnée. Propagation pilotée par une seule région \texttt{parallel} (les barrières par niveau seraient catastrophiques sur 8000 niveaux BFS).

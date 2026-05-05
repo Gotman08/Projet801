@@ -263,7 +263,7 @@ Pour rendre WFC réellement plus rapide sur GPU, il faudrait un changement algor
     \item \textbf{Repenser BFS en frontier-less} / iterative refinement.
 \end{itemize}
 
-Ces pistes sont documentées au Chapitre~\ref{chap:limites}. Le port reste un livrable utile : le code compile et tourne sur GPU, les tests d'invariants passent, mais pour le speedup pratique, le CPU EPYC 9654 reste le meilleur choix sur ce workload.
+Ces pistes sont documentées au Chapitre~\ref{chap:limites}. Le port Kokkos GPU reste utile : le code compile et tourne sur GH200, les tests d'invariants passent. Pour la performance pratique sur ce workload, le CPU EPYC 9654 reste le meilleur choix.
 
 % =============================================================================
 \section{Récap Kokkos}

@@ -6,24 +6,24 @@
 \label{sec:concl:bilan}
 % =============================================================================
 
-\subsection{Trois livrables du sujet, atteints}
+\subsection{Couverture du sujet}
 
 \begin{table}[H]
 \centering
 \begin{tabularx}{\textwidth}{lXl}
 \toprule
-\textbf{Livrable demandé} & \textbf{Notre livraison} & \textbf{Status} \\
+\textbf{Cible du sujet} & \textbf{Implémentation} & \textbf{Status} \\
 \midrule
 (i) Version série & \texttt{wfc\_serial} : extraction toroïdale, \texttt{Bitset} packé \texttt{u64}, BFS niveau-synchrone & OK \\
-(ii) Version parallèle (\texttt{omp task} ou Kokkos) & Les deux livrés : \texttt{wfc\_omp} + \texttt{wfc\_kokkos} & OK + bonus \\
+(ii) Version parallèle (\texttt{omp task} ou Kokkos) & Les deux : \texttt{wfc\_omp} + \texttt{wfc\_kokkos} & OK + bonus \\
 (iii) Extension multi-valeurs & Type \texttt{uint8\_t} partout, samples terrain/maze/smooth, aucune modif solveur & OK \\
 \bottomrule
 \end{tabularx}
-\caption{Trois livrables du sujet, tous atteints.}
+\caption{Cibles du sujet.}
 \label{tab:concl:livrables}
 \end{table}
 
-\subsection{Extensions livrées au-dessus du sujet}
+\subsection{Extensions au-dessus du sujet}
 
 \begin{itemize}
     \item \textbf{Backend GPU CUDA} via refactor Kokkos (compile et tourne sur GH200, 12/12 tests passent).
