@@ -70,6 +70,14 @@ cmake --build build -j
 
 ## Démo Unreal Engine 5 (optionnel)
 
+![Donjon généré par WFCDungeon dans Unreal Engine 5.7](docs/figures/ue5_dungeon_example.png)
+
+*Donjon 24×24 généré depuis `samples/rooms.txt`, rendu par le plugin
+`WFCDungeon` dans UE 5.7. Les murs périmétriques sont fermés par
+`bWallOnBorders`, les pickups et les NPC spawners (sphères rouges sur
+le screenshot) sont scattered aléatoirement sur les cellules walkable
+sans recouvrement.*
+
 Cible CMake additionnelle `wfc_dungeon` qui génère un JSON pour un
 plugin UE 5.7 (`ue5_plugin/WFCDungeon/`). Ne touche ni au benchmark ni
 aux solveurs parallèles : utilise uniquement `WFCSolverSerial` via
