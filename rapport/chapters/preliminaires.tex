@@ -1,0 +1,188 @@
+\chapter{Préliminaires}
+\label{chap:preliminaires}
+
+\epigraph{\textit{``The purpose of computing is insight, not numbers.''}}{--- Richard Hamming}
+
+Ce chapitre introduit les concepts fondamentaux nécessaires à la compréhension des techniques employées dans ce rapport. Nous présentons les notions de complexité algorithmique, les paradigmes de programmation parallèle (OpenMP et Kokkos), ainsi que les métriques de performance utilisées pour évaluer nos implémentations.
+
+% =============================================================================
+\section{Complexité algorithmique}
+\label{sec:prelim:complexite}
+% =============================================================================
+
+\subsection{Notations asymptotiques}
+
+L'analyse de complexité permet d'évaluer le comportement d'un algorithme en fonction de la taille de l'entrée. Nous utilisons les notations asymptotiques standard :
+
+\begin{definition}[Notation $O$ (grand O)]
+Soit $f, g : \mathbb{N} \to \mathbb{R}^+$. On dit que $f(n) = O(g(n))$ s'il existe des constantes $c > 0$ et $n_0$ telles que :
+\[
+\forall n \geq n_0 : f(n) \leq c \cdot g(n)
+\]
+\end{definition}
+
+\begin{definition}[Notation $\Theta$ (grand Theta)]
+$f(n) = \Theta(g(n))$ si $f(n) = O(g(n))$ et $g(n) = O(f(n))$, c'est-à-dire si $f$ et $g$ ont le même ordre de croissance asymptotique.
+\end{definition}
+
+\subsection{Classes de complexité courantes}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Classe} & \textbf{Nom} & \textbf{Exemple WFC} \\
+\midrule
+$O(1)$ & Constante & \texttt{Bitset::test(i)}, \texttt{popcount} d'un mot \\
+$O(\log n)$ & Logarithmique & Allocation \texttt{vector::reserve} amortie \\
+$O(n)$ & Linéaire & Scan d'une cellule de $L$ tuiles \\
+$O(n^2)$ & Quadratique & Construction \texttt{OverlapRules} pour $L^2$ paires \\
+$O(2^n)$ & Exponentielle & Énumération exhaustive des solutions WFC (théorique) \\
+\bottomrule
+\end{tabular}
+\caption{Classes de complexité avec exemples tirés de l'implémentation WFC.}
+\label{tab:complexity_classes}
+\end{table}
+
+\subsection{Le cas WFC}
+
+WFC est un \textbf{problème de satisfaction de contraintes} (CSP). La résolution exhaustive serait exponentielle ($O(L^{\text{rows} \cdot \text{cols}})$ dans le pire cas). L'algorithme de Gumin contourne cela par une heuristique gloutonne : on choisit toujours la cellule d'\textbf{entropie minimale}, on collapse selon les fréquences, puis on propage les contraintes. La complexité \textit{moyenne} est polynomiale (proche du linéaire en nombre de cellules pour les samples bien comportés), mais des contradictions peuvent survenir et provoquer un retry.
+
+% =============================================================================
+\section{Programmation parallèle : concepts fondamentaux}
+\label{sec:prelim:parallele}
+% =============================================================================
+
+\subsection{Motivation}
+
+La loi de Moore, qui prédisait un doublement de la densité des transistors tous les 18 mois, a atteint ses limites physiques. Depuis le milieu des années 2000, l'augmentation des performances passe principalement par le parallélisme :
+\begin{itemize}
+    \item \textbf{Multicœur} : plusieurs unités de calcul sur une même puce (jusqu'à 192 cœurs sur EPYC 9654).
+    \item \textbf{SIMD} : une instruction, plusieurs données (AVX-512 traite 512 bits par cycle).
+    \item \textbf{GPU} : milliers de cœurs SIMT, optimisés pour le data-parallelism massif (NVIDIA GH200 = 16 896 cœurs CUDA).
+    \item \textbf{Clusters} : plusieurs machines interconnectées, distribuant le travail via MPI ou frameworks task-based.
+\end{itemize}
+
+\subsection{Modèles de parallélisme}
+
+\begin{definition}[Mémoire partagée vs distribuée]
+\begin{itemize}
+    \item \textbf{Mémoire partagée} : tous les threads accèdent à un espace mémoire commun. Synchronisation par locks, atomics, barrières. Modèle d'OpenMP et de Kokkos en mode multi-thread.
+    \item \textbf{Mémoire distribuée} : chaque processus a sa mémoire propre, communication par messages. Modèle de MPI.
+\end{itemize}
+\end{definition}
+
+WFC se prête naturellement à la mémoire partagée : la wave est un buffer plat unique, partagée par tous les threads, qui modifient des cellules différentes en parallèle (BFS niveau-synchrone). MPI ne serait pertinent que pour distribuer plusieurs solveurs sur un cluster, ce qui ne change pas la nature du calcul intra-solveur.
+
+\subsection{OpenMP : tasks explicites}
+
+OpenMP \cite{openmp45} est l'API standard pour le parallélisme à mémoire partagée en C++. Il offre plusieurs modèles :
+\begin{itemize}
+    \item \texttt{\#pragma omp parallel for} : distribution statique d'une boucle (work-sharing classique).
+    \item \texttt{\#pragma omp task} : tâches dynamiques créées explicitement, exécutées par un pool de threads. Adapté aux calculs irréguliers (récursifs, BFS).
+    \item \texttt{\#pragma omp atomic} : opérations atomiques sur variables partagées.
+\end{itemize}
+
+Le \textbf{sujet impose l'API \texttt{task} explicite}. Cette contrainte n'est pas arbitraire : le BFS de WFC produit des frontières de taille variable (de 1 à plusieurs centaines de cellules par niveau). Une distribution statique \texttt{parallel for} sous-utiliserait les threads sur les niveaux courts et oversubscriberait sur les niveaux longs. Les tasks dynamiques amortissent mieux cette irrégularité.
+
+\subsection{Kokkos : portabilité CPU + GPU}
+
+Kokkos \cite{kokkos2014} est un framework C++ développé par les laboratoires DOE (Sandia, Oak Ridge, Argonne) qui abstrait les architectures parallèles modernes. Le même code source compile vers :
+\begin{itemize}
+    \item OpenMP, Threads, Serial (CPU) ;
+    \item CUDA (NVIDIA), HIP (AMD), SYCL (Intel) sur GPU.
+\end{itemize}
+
+Les primitives clés sont \texttt{Kokkos::View<T*>} (conteneur de tableau qui peut vivre sur \texttt{HostSpace} ou \texttt{CudaSpace}) et \texttt{Kokkos::parallel\_for} (équivalent abstrait de \texttt{omp parallel for} ou de kernel CUDA selon le backend choisi). Le coût d'utilisation : il faut suivre les conventions Kokkos (\texttt{KOKKOS\_INLINE\_FUNCTION}, pas d'allocation dynamique dans le kernel, capture par valeur des structures triviales).
+
+% =============================================================================
+\section{Métriques de performance}
+\label{sec:prelim:metriques}
+% =============================================================================
+
+\subsection{Speedup}
+
+\begin{definition}[Speedup]
+Le speedup d'une exécution parallèle à $p$ threads est défini par :
+\[
+S(p) = \frac{T(1)}{T(p)}
+\]
+où $T(1)$ est le temps série et $T(p)$ le temps à $p$ threads.
+\end{definition}
+
+Idéalement, $S(p) = p$ (scaling linéaire). En pratique, $S(p) < p$ à cause des coûts de synchronisation, de la fraction séquentielle, et du contention mémoire.
+
+\subsection{Efficacité parallèle}
+
+\begin{definition}[Efficacité parallèle]
+\[
+E(p) = \frac{S(p)}{p} = \frac{T(1)}{p \cdot T(p)}
+\]
+\end{definition}
+
+$E(p) \in [0, 1]$. Une efficacité de 0.5 signifie que la moitié des threads sont effectivement productifs, l'autre moitié est en attente ou en redondance.
+
+\subsection{Loi d'Amdahl}
+
+\begin{theorem}[Loi d'Amdahl \cite{amdahl1967}]
+Si une fraction $f$ d'un programme est parallélisable et $(1 - f)$ est intrinsèquement séquentielle, le speedup maximum atteignable avec $p$ threads est :
+\[
+S(p) = \frac{1}{(1 - f) + \frac{f}{p}}
+\]
+Le ceiling théorique quand $p \to \infty$ vaut :
+\[
+S_{\max} = \frac{1}{1 - f}
+\]
+\end{theorem}
+
+\begin{important}{Conséquence pratique pour WFC}
+Un fit Amdahl sur les mesures Romeo donne $f \approx 0.944$ pour binary\_L11 256×256. Le ceiling théorique est donc $S_{\max} \approx 17.8$, mais le peak observé n'atteint que 8.23× à 16 threads. La différence (54\%) provient des coûts non-Amdahl : NUMA, contention atomique, fork/join répété, dont le modèle ne tient pas compte.
+\end{important}
+
+\subsection{Strong scaling vs weak scaling}
+
+\begin{definition}[Strong scaling]
+Mesure de $S(p)$ à \textbf{taille de problème fixe} et nombre de threads $p$ croissant. Question posée : « combien de threads pour résoudre le problème plus vite ? »
+\end{definition}
+
+\begin{definition}[Weak scaling]
+Mesure de $T(p)$ à \textbf{taille de problème par thread fixe} (le problème grandit proportionnellement à $p$). Question posée : « combien de fois plus gros peut-on aller avec plus de threads ? »
+\end{definition}
+
+Les benchmarks de ce rapport sont \textit{strong scaling} : on mesure $T(p)$ pour des grilles fixées (32, 64, 128, 256, 512) à threads croissants.
+
+% =============================================================================
+\section{Architectures cibles}
+\label{sec:prelim:archi}
+% =============================================================================
+
+\subsection{Hiérarchie mémoire}
+
+Les performances HPC dépendent fortement de la hiérarchie mémoire. Sur EPYC 9654 :
+\begin{itemize}
+    \item \textbf{Registres} : ~1 ns d'accès, quelques centaines de bits.
+    \item \textbf{L1} : 32 KB par cœur, latence ~4 cycles.
+    \item \textbf{L2} : 1 MB par cœur, latence ~12 cycles.
+    \item \textbf{L3} : 32 MB par CCX (chaque CCX groupe 8 cœurs), latence ~50 cycles.
+    \item \textbf{DRAM locale au socket} : ~80 ns.
+    \item \textbf{DRAM cross-socket} : ~140 ns (1.7× plus cher).
+\end{itemize}
+
+Pour WFC, la \textbf{wave} occupe 16 KB pour 64×64 binaire (tient en L2), 65 KB pour 128×128 (déborde L1), 524 KB pour 256×256 (déborde L2 par cœur). C'est ce qui explique en partie pourquoi le speedup est meilleur sur 256×256 que sur 128×128 : à 256, on passe plus de temps en attente mémoire, ce que le parallélisme aide à amortir.
+
+\subsection{NUMA}
+
+Sur EPYC 9654, les 192 cœurs sont organisés en \textbf{8 nœuds NUMA} (3 CCDs par nœud, 8 cœurs par CCD). Un accès mémoire \textit{cross-NUMA} coûte ~3× plus cher qu'un accès local.
+
+L'optimisation classique est le \textit{first-touch} : lors de l'allocation d'un tableau partagé, le thread qui le \textit{touche en premier} est celui qui reçoit la page physique sur son nœud NUMA. Pour WFC, le constructeur de \texttt{Wave} parallélise l'initialisation par \texttt{\#pragma omp parallel for}, ce qui mappe correctement les pages aux nœuds NUMA des threads consommateurs.
+
+\subsection{GPU NVIDIA GH200}
+
+La partition \texttt{armgpu} de Romeo dispose de \textbf{NVIDIA GH200 Grace Hopper}, qui combine :
+\begin{itemize}
+    \item un CPU ARM Neoverse-V2 (72 cœurs) ;
+    \item un GPU H100 (132 SMs, 16 896 cœurs CUDA) ;
+    \item 97 GB de mémoire HBM3 sur le GPU.
+\end{itemize}
+
+L'ensemble communique via \textbf{NVLink-C2C}, avec une bande passante ~4× supérieure au PCIe 5. C'est l'architecture cible que nous utilisons pour le port Kokkos+CUDA.

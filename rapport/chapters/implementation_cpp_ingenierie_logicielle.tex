@@ -1,0 +1,272 @@
+\chapter{Implémentation C++ et ingénierie logicielle}
+\label{chap:implementation}
+
+\epigraph{\textit{``Any fool can write code that a computer can understand. Good programmers write code that humans can understand.''}}{--- Martin Fowler}
+
+\section{Organisation du dépôt}
+
+Le projet est organisé selon une architecture modulaire séparant clairement les interfaces, les implémentations, et les points d'entrée.
+
+\subsection{Structure des répertoires}
+
+\begin{lstlisting}[language=bash, caption={Arborescence du projet WFC}]
+Projet801/
+├── include/wfc/         # Headers publics
+│   ├── Grid.hpp           # Domaine 2D
+│   ├── Tile.hpp           # Sous-bloc N×N + helpers symétries
+│   ├── Bitset.hpp         # Bitset packé sur uint64_t
+│   ├── TileSet.hpp        # Catalogue de tuiles + fréquences
+│   ├── OverlapRules.hpp   # Compatibilités tuile×offset
+│   ├── Wave.hpp           # Superposition par cellule
+│   ├── WFCSolver.hpp      # Interface solver + SolverOptions/Stats
+│   ├── GridIO.hpp         # I/O txt, PPM, PNG
+│   ├── solvers/           # Backends spécialisés
+│   │   ├── WFCSolverSerial.hpp
+│   │   ├── WFCSolverOMP.hpp
+│   │   └── WFCSolverKokkos.hpp
+│   └── internal/          # Helpers et base class
+│       ├── WFCSolverBase.hpp
+│       └── SolverCommon.hpp
+├── src/                 # Implémentations correspondantes
+├── apps/                # Points d'entrée
+│   ├── wfc_serial.cpp
+│   ├── wfc_omp.cpp
+│   ├── wfc_kokkos.cpp
+│   ├── benchmark.cpp
+│   └── wfc_dungeon.cpp    # Démo UE5 (opt-in BUILD_DUNGEON)
+├── tests/               # Suite de tests unitaires (15 suites)
+├── samples/             # Grilles d'entrée
+├── scripts/             # SLURM, plot, analyze, render
+├── results/             # CSV de benchmarks
+├── docs/                # Documentation projet (ARCHITECTURE, ALGORITHM, etc.)
+├── ue5_plugin/          # Plugin Unreal Engine 5.7
+└── third_party/         # stb_image_write.h
+\end{lstlisting}
+
+\subsection{Modules et responsabilités}
+
+Le tableau~\ref{tab:modules} détaille la responsabilité de chaque module.
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Module} & \textbf{Responsabilité} \\
+\midrule
+\texttt{Grid.hpp} & Domaine 2D row-major en \texttt{uint8\_t}, accès toroïdal via \texttt{at\_torus(r, c)} \\
+\midrule
+\texttt{Tile.hpp} & Pattern $N \times N$ POD-like avec hash FNV-1a et helpers de symétrie (\texttt{rotated\_90}, \texttt{reflected\_horizontal}) \\
+\midrule
+\texttt{Bitset.hpp} & Trois classes : \texttt{Bitset} propriétaire, \texttt{BitsetView} mutable, \texttt{ConstBitsetView} lecture-seule. Opérations 64-bit packées. \\
+\midrule
+\texttt{TileSet.hpp/cpp} & Extraction toroïdale $N \times N$, déduplication, expansion D4 optionnelle \\
+\midrule
+\texttt{OverlapRules.hpp/cpp} & Construction parallèle (OMP) des règles de compatibilité \\
+\midrule
+\texttt{Wave.hpp} & Buffer plat de bitsets, NUMA first-touch, accès toroïdal pour BFS \\
+\midrule
+\texttt{WFCSolverBase.hpp/cpp} & Boucle solve, dispatch séquentiel/parallèle/backtrack, gestion stats \\
+\midrule
+\texttt{SolverCommon.hpp/cpp} & Helpers partagés : \texttt{weighted\_entropy}, \texttt{weighted\_pick}, \texttt{cell\_jitter}, \texttt{serial\_propagate}, \texttt{serial\_run\_attempt}, \texttt{serial\_run\_attempt\_backtrack} \\
+\midrule
+\texttt{WFCSolverSerial.cpp} & $\sim 25$ lignes : \texttt{pick\_cell} = \texttt{serial\_min\_entropy}, \texttt{propagate} = \texttt{serial\_propagate} \\
+\midrule
+\texttt{WFCSolverOMP.cpp} & Backend OpenMP : \texttt{parallel\_min\_entropy}, \texttt{propagate\_tasks}, \texttt{atomic\_and\_with} \\
+\midrule
+\texttt{WFCSolverKokkos.cpp} & Backend Kokkos GPU-portable : \texttt{Kokkos::View}, \texttt{PropagateOp} fonctor, \texttt{kHostOnly} compile-time branch \\
+\bottomrule
+\end{tabularx}
+\caption{Modules du projet et leurs responsabilités.}
+\label{tab:modules}
+\end{table}
+
+% =============================================================================
+\section{Structures de données critiques}
+\label{sec:impl:structures}
+% =============================================================================
+
+\subsection{Bitset packé sur uint64\_t}
+
+\begin{important}{Pourquoi pas \texttt{std::bitset<N>} ou \texttt{std::vector<bool>} ?}
+Trois raisons :
+\begin{enumerate}
+    \item \textbf{Taille dynamique requise} : \texttt{std::bitset<N>} exige $N$ en \texttt{constexpr}, incompatible avec un $L$ déterminé à runtime selon l'échantillon.
+    \item \textbf{Vectorisation} : \texttt{std::vector<bool>} interdit l'accès direct aux mots sous-jacents. On veut faire des \texttt{\_\_builtin\_popcountll} et des AND/OR 64 bits à la fois. Notre \texttt{Bitset} expose \texttt{words()} directement.
+    \item \textbf{Allocation} : \texttt{std::vector<bool>} reste un wrapper sur \texttt{vector<u8>}, pas plus dense. Notre \texttt{Bitset} est exactement $\lceil L / 64 \rceil$ mots de 64 bits.
+\end{enumerate}
+\end{important}
+
+Pour $L = 11$ (l'exemple du sujet), le bitset tient dans un seul mot. Pour $L = 73$ (terrain $N = 3$), dans deux mots. Toujours en cache L1.
+
+\subsection{Wave à buffer plat}
+
+\begin{important}{Pourquoi pas \texttt{vector<Bitset>} ?}
+Naïvement on mettrait un \texttt{vector<Bitset>} (un Bitset par cellule). Mauvais :
+\begin{itemize}
+    \item Chaque \texttt{Bitset} possède sa propre \texttt{vector<u64>}, autant d'allocations que de cellules. Pour $256 \times 256$, ce sont 65 536 allocations.
+    \item Indirection mémoire supplémentaire à chaque accès cellule (pointeur vers le buffer interne du vector).
+\end{itemize}
+\end{important}
+
+Choix : un seul \texttt{vector<u64>} contigu de taille $r \cdot c \cdot \text{words\_per\_cell}$, et les accesseurs \texttt{at(r, c)} retournent une \texttt{BitsetView} non-propriétaire qui pointe dans ce buffer. Une seule allocation pour toute la wave, layout cache-friendly, NUMA-friendly.
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering
+Voir \texttt{schemas/wave\_memory\_layout.md} pour le prompt de génération.\\
+Layout flat de la wave : un seul buffer \texttt{vector<u64>}, indexation \\
+\texttt{(r, c)} → offset \texttt{(r * cols + c) * words\_per\_cell}, BitsetView non-propriétaire.
+}}
+\caption{Wave en mémoire : un seul buffer contigu, partagé par tous les threads, avec accès via BitsetView.}
+\label{fig:wave_layout}
+\end{figure}
+
+\subsection{First-touch parallèle pour NUMA}
+
+Le constructeur de \texttt{Wave} initialise les cellules en parallèle :
+
+\begin{lstlisting}[language=C++]
+#pragma omp parallel for schedule(static)
+for (std::ptrdiff_t c = 0; c < total_cells; ++c) {
+    const std::size_t base = c * words_per_cell_;
+    for (std::size_t w = 0; w + 1 < words_per_cell_; ++w) {
+        words_[base + w] = ~0ULL;  // tous bits set
+    }
+    if (words_per_cell_ > 0) {
+        words_[base + (words_per_cell_ - 1)] = tail_mask;
+    }
+}
+\end{lstlisting}
+
+Avec \texttt{OMP\_PROC\_BIND=close} et \texttt{OMP\_PLACES=cores}, le thread qui touche en premier la mémoire est aussi celui qui la consommera ensuite. Sur EPYC 9654 (8 NUMA nodes), cela évite que le thread 0 first-touche tout et que 7/8 des accès traversent un boundary NUMA.
+
+\subsection{OverlapRules à plat}
+
+Les règles d'adjacence sont stockées dans un \texttt{vector<Bitset>} indexé par
+\[
+\text{idx} = t \cdot (2N-1)^2 + \text{offset\_index}(dx, dy)
+\]
+avec $\text{offset\_index}(dx, dy) = (dx + N - 1) \cdot (2N - 1) + (dy + N - 1)$.
+
+Pour le sample du sujet ($L = 11$, $N = 2$), cela représente $11 \times 9 \times 1 \times 8 = 792$ octets de table. Tient en L1, accédée intensivement pendant la propagation.
+
+% =============================================================================
+\section{Conception orientée objet : Template Method}
+\label{sec:impl:tm}
+% =============================================================================
+
+L'architecture des solvers utilise le pattern \textbf{Template Method} :
+
+\begin{lstlisting}[language=C++]
+class WFCSolverBase : public WFCSolver {
+public:
+    // La méthode de plus haut niveau est finale.
+    Grid solve(const TileSet&, const OverlapRules&,
+               const SolverOptions&, SolverStats&) override final;
+
+protected:
+    // Hot path : à surcharger par chaque backend.
+    virtual int pick_cell(...) = 0;
+    virtual bool propagate(...) = 0;
+
+    // Hooks optionnels (Kokkos init/finalize).
+    virtual void on_solve_begin() {}
+    virtual void on_solve_end() {}
+    virtual const char* backend_name() const = 0;
+
+private:
+    // Boucle séquentielle, dispatch parallel-attempts/backtrack.
+    Grid solve_sequential(...);
+    Grid solve_parallel(...);
+};
+\end{lstlisting}
+
+\textbf{Avantages :}
+\begin{itemize}
+    \item Le retry, la mesure de stats, l'orchestration parallel-attempts, le dispatch backtrack sont écrits \textbf{une seule fois} dans la classe de base.
+    \item Chaque backend (\texttt{Serial}, \texttt{OMP}, \texttt{Kokkos}) ne fournit que les deux primitives \texttt{pick\_cell} et \texttt{propagate} qui le distinguent.
+    \item Les invariants de l'orchestration (déterminisme, ordre des seeds) sont garantis identiquement pour tous les backends.
+\end{itemize}
+
+% =============================================================================
+\section{Build : trois libs CMake}
+\label{sec:impl:cmake}
+% =============================================================================
+
+Le \texttt{CMakeLists.txt} produit trois libs distinctes plutôt qu'une lib monolithique avec \texttt{ifdef} :
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{lXl}
+\toprule
+\textbf{Cible CMake} & \textbf{Sources} & \textbf{Dépend de} \\
+\midrule
+\texttt{wfc\_core} & Grid, TileSet, OverlapRules, Wave, GridIO, SolverCommon, WFCSolverBase, WFCSolverSerial & OpenMP::OpenMP\_CXX si \texttt{USE\_OMP=ON} (pour la construction parallèle des règles) \\
+\midrule
+\texttt{wfc\_omp\_lib} & WFCSolverOMP & wfc\_core, OpenMP::OpenMP\_CXX \\
+\midrule
+\texttt{wfc\_kokkos\_lib} & WFCSolverKokkos & wfc\_core, Kokkos::kokkos \\
+\bottomrule
+\end{tabularx}
+\caption{Cibles CMake et leurs dépendances.}
+\label{tab:cmake_targets}
+\end{table}
+
+\textbf{Bénéfices :} \texttt{wfc\_serial} (binaire) ne lie pas OpenMP s'il n'est pas demandé. \texttt{wfc\_omp} ne lie pas Kokkos. La dépendance \texttt{Kokkos::kokkos} reste localisée à \texttt{wfc\_kokkos\_lib}, invisible pour qui n'utilise pas Kokkos.
+
+\subsection{Options CMake}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{lll>{\hsize=2\hsize}X}
+\toprule
+\textbf{Option} & \textbf{Défaut} & \textbf{Effet} & \textbf{Notes} \\
+\midrule
+\texttt{CMAKE\_BUILD\_TYPE} & Release & \texttt{-O3 -march=native} & Debug : \texttt{-O0 -g3} \\
+\texttt{USE\_OMP} & ON & wfc\_omp\_lib + tests OMP & \\
+\texttt{USE\_KOKKOS} & OFF & wfc\_kokkos\_lib + tests Kokkos & \texttt{Kokkos\_ROOT} requis \\
+\texttt{USE\_LTO} & OFF & Link-Time Optimization & +3.4\% mesuré, A/B sur 11 runs \\
+\texttt{BUILD\_DUNGEON} & OFF & wfc\_dungeon CLI + UE5 plugin & \\
+\texttt{USE\_TSAN} & OFF & ThreadSanitizer (race detection) & Incompatible ASAN, LTO \\
+\texttt{USE\_ASAN} & OFF & AddressSanitizer + UBSan & Incompatible LTO \\
+\texttt{BUILD\_TESTING} & ON & Suite de tests ctest & \\
+\bottomrule
+\end{tabularx}
+\caption{Options CMake exposées par le projet.}
+\label{tab:cmake_options}
+\end{table}
+
+% =============================================================================
+\section{Conventions de code}
+\label{sec:impl:conventions}
+% =============================================================================
+
+\begin{itemize}
+    \item C++17, sans dépendance externe runtime à part \texttt{stb\_image\_write.h} (third\_party, public domain).
+    \item \texttt{Value = std::uint8\_t} partout (alphabet jusqu'à 256 valeurs).
+    \item Headers publics dans \texttt{include/wfc/}, sources dans \texttt{src/}. Headers internes dans \texttt{include/wfc/internal/}.
+    \item Aucun warning sous \texttt{-Wall -Wextra -Wpedantic -Werror} (g++ 14+, clang).
+    \item Pas de \texttt{std::cout}/\texttt{printf} dans \texttt{src/} : I/O réservée aux apps.
+    \item Pas de framework de test externe : \texttt{tests/test\_helpers.hpp} (40 lignes) suffit pour \texttt{WFC\_CHECK} / \texttt{WFC\_CHECK\_EQ} avec compteur global.
+\end{itemize}
+
+% =============================================================================
+\section{Plates-formes vérifiées}
+\label{sec:impl:plateformes}
+% =============================================================================
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{lXX}
+\toprule
+\textbf{Plateforme} & \textbf{Toolchain} & \textbf{Notes} \\
+\midrule
+Ubuntu 24.04 / WSL2 & g++ 13.3, OpenMP 4.5 & Machine de développement principale \\
+Windows 11 (MinGW UCRT) & MSYS2 + g++ 16.1, OpenMP 5.2, Ninja & 13/13 tests passent ; perf parallèle limitée par heap lock MinGW \\
+Romeo (RHEL 9, EPYC 9654) & spack + gcc 14.2, OpenMP 4.5 & Plate-forme cible HPC, 192 cœurs, 8 NUMA \\
+Romeo armgpu (Grace+H100) & spack + gcc 11.4 + nvcc 12.9 + Kokkos CUDA & Build et tests Kokkos GPU validés \\
+\bottomrule
+\end{tabularx}
+\caption{Plates-formes utilisées pour le développement et les benchmarks.}
+\label{tab:plateformes}
+\end{table}

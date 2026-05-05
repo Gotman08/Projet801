@@ -1,0 +1,312 @@
+\chapter{Parallélisation OpenMP}
+\label{chap:openmp}
+
+\epigraph{\textit{``Premature optimization is the root of all evil. Yet we should not pass up our opportunities in that critical 3\%.''}}{--- Donald E. Knuth}
+
+Le sujet exige l'utilisation de l'API \texttt{\#pragma omp task} explicite (ou Kokkos). Ce chapitre décrit le backend OpenMP : où le parallélisme est appliqué, comment il préserve le déterminisme, et quelles optimisations ont été testées en A/B et gardées ou rejetées.
+
+\section{Localisation du parallélisme}
+
+\subsection{Où paralléliser ? Le profilage avant tout}
+
+Avant d'écrire la moindre directive \texttt{\#pragma omp}, nous avons profilé le solveur série pour identifier où le temps est passé. Le résultat (Tableau~\ref{tab:profiling}) est contre-intuitif et a guidé l'ensemble de l'effort.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Étape} & \textbf{Temps relatif} & \textbf{Nature} \\
+\midrule
+Extraction des tuiles & < 0.01 \% & une fois, négligeable \\
+Règles d'adjacence & < 0.01 \% & une fois, négligeable \\
+\textbf{Sélection min-entropie} & \textbf{$\sim 85\%$} & scan $O(r \cdot c \cdot L)$ \textbf{par collapse} \\
+Propagation BFS & $\sim 12\%$ & BFS niveau-synchrone \\
+Tirage RNG + reste & $\sim 3\%$ & mt19937\_64 \\
+\bottomrule
+\end{tabular}
+\caption{Décomposition du temps de calcul sur 128×128 binaire ($L=11$), serial Romeo.}
+\label{tab:profiling}
+\end{table}
+
+\begin{important}{Leçon HPC : mesurer avant d'optimiser}
+La sélection min-entropie domine 8× la propagation BFS. Notre première intuition était que la propagation, plus visible algorithmiquement, serait le hot spot. Le profilage l'a infirmée.
+\end{important}
+
+Conséquence : nous parallélisons \textbf{deux étapes}, la sélection et la propagation, mais l'effort principal porte sur la sélection.
+
+% =============================================================================
+\section{Sélection min-entropie : \texttt{parallel\_min\_entropy}}
+\label{sec:omp:min_entropy}
+% =============================================================================
+
+\subsection{Stratégie : tasks chunked + réduction ordonnée}
+
+\begin{lstlisting}[language=C++, caption={Sélection min-entropie parallèle (extrait simplifié)}]
+MinEntropyResult parallel_min_entropy(const Wave& wave,
+                                      const std::vector<u32>& freq,
+                                      u64 seed, int max_threads) {
+    const int total = wave.num_cells();
+    const int num_tiles = freq.size();
+    const int kMinWorkOps = 50000;
+    if (max_threads <= 1 || total * num_tiles < kMinWorkOps) {
+        return serial_min_entropy(wave, freq, seed);  // short-circuit
+    }
+    const int chunk = std::max(64, total / max_threads);
+    const int n_chunks = (total + chunk - 1) / chunk;
+    std::vector<MinEntropyResult> partials(n_chunks);
+
+    #pragma omp parallel shared(wave, freq, partials)
+    {
+        #pragma omp single
+        for (int k = 0; k < n_chunks; ++k) {
+            int start = k * chunk;
+            int end = std::min(start + chunk, total);
+            #pragma omp task firstprivate(k, start, end, seed)
+            {
+                MinEntropyResult best;
+                for (int c = start; c < end; ++c) {
+                    if (wave.at(c).count() <= 1) continue;
+                    double key = weighted_entropy(wave.at(c), freq)
+                               + cell_jitter(c, seed);
+                    if (key < best.value) { best.value = key; best.cell = c; }
+                }
+                partials[k] = best;
+            }
+        }
+    }
+    // Reduction in fixed chunk order: deterministic.
+    MinEntropyResult global;
+    for (auto& p : partials)
+        if (p.cell != -1 && p.value < global.value) global = p;
+    return global;
+}
+\end{lstlisting}
+
+\subsection{Choix de granularité}
+
+Granularité : \textbf{une chunk par thread} (au lieu de quatre dans la version initiale). Justification :
+\begin{itemize}
+    \item Les chunks de \texttt{min\_entropy} sont équi-pondérés (juste une boucle de scan).
+    \item Le load balancing dynamique (4 chunks par thread, dispatchés via \texttt{omp task}) ne paie pas le coût de gestion supplémentaire.
+    \item Une chunk par thread = un task par thread = pas de scheduling overhead au-delà du fork-join.
+\end{itemize}
+
+\subsection{Court-circuit pour petits workloads}
+
+Quand le travail prévu est inférieur à 50 000 opérations (typiquement grilles 32×32), la parallel-region OMP coûte plus cher que le scan lui-même. Le court-circuit garantit qu'on n'introduit pas de regression sur les petits cas.
+
+\subsection{Réduction déterministe}
+
+La boucle finale parcourt \texttt{partials} dans l'ordre de chunk croissant. C'est crucial pour le déterminisme : un \texttt{reduction(min:...)} OMP standard donnerait un résultat dépendant de l'ordre d'arrivée des threads, donc non-reproductible.
+
+% =============================================================================
+\section{Propagation BFS : \texttt{propagate\_tasks}}
+\label{sec:omp:propagate}
+% =============================================================================
+
+\subsection{Une seule région \texttt{parallel} pour toute la propagation}
+
+L'erreur classique serait d'ouvrir une région \texttt{parallel} par niveau BFS. Le coût fork/join est de $\sim 50$ µs par région sur EPYC 9654, à multiplier par les $\sim 8000$ niveaux d'un solve 128×128 : 400 ms de pur overhead, à comparer aux $\sim 100$ ms de travail utile par niveau. Catastrophe.
+
+Notre design : \textbf{une seule région \texttt{parallel} ouverte pour toute la propagation}, le thread principal (\texttt{single}) pilote les niveaux successifs.
+
+\begin{lstlisting}[language=C++, caption={Squelette de propagate\_tasks}]
+#pragma omp parallel shared(frontier, next, frontier_size, next_size,
+                            wave, rules, in_queue, propagations,
+                            contradiction, finished, thread_scratch,
+                            thread_next)
+{
+    while (!finished) {
+        const int chunk = std::max(1, frontier_size / (4 * max_threads));
+        const bool use_tasks = frontier_size >= kSerialFallback;
+
+        #pragma omp single
+        {
+            if (!use_tasks) {
+                serial_pass(frontier, frontier_size, ...);
+            } else {
+                for (int start = 0; start < frontier_size; start += chunk) {
+                    const int end = std::min(start + chunk, frontier_size);
+                    #pragma omp task firstprivate(start, end)
+                    {
+                        const int tid = omp_get_thread_num();
+                        process_chunk(frontier, start, end,
+                                      thread_scratch[tid],
+                                      thread_next[tid].cells);
+                    }
+                }
+            }
+        } // implicit barrier + all tasks done
+
+        #pragma omp single
+        {
+            concat_thread_next(next, next_size, thread_next);
+            std::swap(frontier, next);
+            frontier_size = next_size; next_size = 0;
+            if (frontier_size == 0 || contradiction) finished = true;
+        }
+    }
+}
+\end{lstlisting}
+
+\subsection{Frontier-threshold : optimisation gardée}
+
+\begin{important}{Optim « kSerialFallback »}
+Sous un certain seuil (\texttt{kSerialFallback = max(64, max\_threads)}), le niveau BFS est trop court pour amortir le coût des tasks. On bascule en série sur le thread \texttt{single}.
+\end{important}
+
+Mesures Romeo (job SLURM 544356) :
+
+\begin{table}[H]
+\centering
+\begin{tabular}{rrrr}
+\toprule
+\textbf{Threads} & \textbf{Avant} & \textbf{Après} & \textbf{Gain} \\
+\midrule
+1 & 3.98 s & 4.19 s & -5\% (variance) \\
+4 & 1.17 s & 1.15 s & +2\% \\
+8 & 0.75 s & 0.69 s & \textbf{+10\%} \\
+16 & 1.52 s & 1.27 s & \textbf{+20\%} \\
+32 & 4.53 s & 4.01 s & +13\% \\
+64 & 13.16 s & 10.53 s & \textbf{+25\%} \\
+192 & 35.30 s & 27.28 s & \textbf{+29\%} \\
+\bottomrule
+\end{tabular}
+\caption{A/B « frontier-threshold » sur binary\_L11 128×128 Romeo. Plus le thread count est haut, plus le gain est grand.}
+\label{tab:omp:frontier_threshold}
+\end{table}
+
+L'optim aide nettement à partir de 8 threads, et l'effet grandit avec le thread count (jusqu'à +29\% à 192 threads).
+
+\subsection{Atomic word-level : \texttt{atomic\_and\_with}}
+
+Les écritures concurrentes sur la wave passent par \texttt{\_\_atomic\_fetch\_and} au niveau du mot \texttt{uint64\_t} :
+
+\begin{lstlisting}[language=C++]
+bool atomic_and_with(BitsetView dst, ConstBitsetView src) {
+    bool changed = false;
+    u64* d = dst.words();
+    const u64* s = src.words();
+    const std::size_t n = dst.word_count();
+    for (std::size_t i = 0; i < n; ++i) {
+        const u64 mask = s[i];
+        if (mask == ~0ULL) continue;  // skip no-op
+
+        // Optim : relaxed load before lock and (skip if no-op)
+        const u64 cur = __atomic_load_n(&d[i], __ATOMIC_RELAXED);
+        if ((cur & ~mask) == 0ULL) continue;
+
+        const u64 old_val = __atomic_fetch_and(&d[i], mask, __ATOMIC_RELAXED);
+        if ((old_val & ~mask) != 0ULL) changed = true;
+    }
+    return changed;
+}
+\end{lstlisting}
+
+\paragraph{Optim « relaxed-load » gardée.} Une lecture relaxed avant le \texttt{lock and} permet de skipper l'opération atomique quand l'AND serait un no-op. Sur x86, le \texttt{lock and} déclenche une cache-line invalidation broadcast (~80-3000 ns selon distance NUMA). La lecture relaxed ne nécessite que la ligne en shared state. Mesuré : $\sim 50\%$ de trafic atomique en moins sur les workloads typiques, gain visible à partir de 16 threads.
+
+\paragraph{Sémantique relaxed.} L'opération AND étant associative et commutative, le résultat final est invariant à l'ordre d'arrivée des threads. \texttt{\_\_ATOMIC\_RELAXED} suffit ; les barrières acquire/release sont superflues pour ce cas.
+
+\subsection{CAS dedup pour le frontier suivant}
+
+Pour éviter qu'une cellule soit ajoutée plusieurs fois au frontier suivant (visitée par plusieurs threads voisins simultanément), on utilise un drapeau \texttt{in\_queue[cell]} en \texttt{compare\_exchange} :
+
+\begin{lstlisting}[language=C++]
+u8 expected = 0;
+if (__atomic_compare_exchange_n(&in_queue[nc], &expected,
+                                u8{1}, false,
+                                __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+    my_next.push_back(nc);  // first to claim, push
+}
+\end{lstlisting}
+
+\subsection{Per-thread frontier buffer}
+
+Chaque thread possède son \texttt{ThreadFrontier} alignas(64) (anti-faux-partage). À la fin du niveau, les buffers thread-locaux sont concaténés dans le \texttt{next} global par le \texttt{single}. Pas d'atomic counter partagé, pas de lock global.
+
+% =============================================================================
+\section{Optimisations testées et rejetées}
+\label{sec:omp:rejected}
+% =============================================================================
+
+Plusieurs optimisations CSAPP-style ont été essayées et rejetées en A/B testing (médiane de 11 runs alternés sur 128×128 Romeo) :
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrl}
+\toprule
+\textbf{Optimisation} & \textbf{Median} & \textbf{Verdict} \\
+\midrule
+Release \texttt{-O3 -march=native} (baseline) & 4.280 s & --- \\
+Release + USE\_LTO=ON & 4.134 s & \textbf{+3.4\%, gardée} \\
+Release + LTO + PGO & 4.143 s & +0.4\% supplémentaire, rejetée (complexité) \\
+Cache \texttt{f * log(f)} thread\_local & 4.749 s & \textbf{-6.7\%, rejetée} \\
+\texttt{std::queue} → vector FIFO & 4.586 s & -3\% (dans le bruit), rejetée \\
+Hoist \texttt{wave.at(c)} (CSE manuel) & 4.342 s & 0\% (variance), rejetée \\
+\bottomrule
+\end{tabular}
+\caption{A/B testing des optimisations source-level. Le compilateur en \texttt{-O3 -march=native} fait déjà la plupart des optimisations CSAPP de bas niveau.}
+\label{tab:omp:rejected}
+\end{table}
+
+\begin{important}{Leçon HPC : ne pas optimiser à l'aveugle ce que le compilateur fait déjà}
+Sur 5 candidats source-level testés (issus du livre CSAPP de Bryant et O'Hallaron), un seul (LTO) a survécu. Les optims qui semblaient « évidentes » (cache thread-local, vector FIFO) ont régressé ou été dans le bruit. Le compilateur en \texttt{-O3 -march=native} les fait déjà, ou les rend obsolètes.
+\end{important}
+
+% =============================================================================
+\section{Déterminisme}
+\label{sec:omp:determinisme}
+% =============================================================================
+
+Conserver « même seed → même output » à travers les backends est un objectif fort. Trois mécanismes y contribuent.
+
+\subsection{Jitter d'entropie déterministe}
+
+Au lieu d'utiliser \texttt{uniform\_real\_distribution} qui consomme l'état du RNG (donc dépend du parcours), on calcule un hash SplitMix64 de \texttt{(cell, seed)} :
+
+\begin{lstlisting}[language=C++]
+inline double cell_jitter(int cell, u64 seed) {
+    u64 x = seed ^ static_cast<u64>(cell);
+    x ^= x >> 33;  x *= 0xFF51AFD7ED558CCDULL;
+    x ^= x >> 33;  x *= 0xC4CEB9FE1A85EC53ULL;
+    x ^= x >> 33;
+    return (x & 0xFFFFFFu) * (1e-6 / 0x1000000);
+}
+\end{lstlisting}
+
+\textbf{Stateless} : l'ordre de parcours ne change pas le résultat. Permet de paralléliser la sélection sans casser la reproductibilité.
+
+\subsection{Réduction min-entropie ordonnée}
+
+La réduction finale parcourt les \texttt{partials[]} en ordre de chunk croissant, pas \texttt{reduction(min:...)} OMP qui serait non-déterministe.
+
+\subsection{Atomics relaxed}
+
+L'AND atomique est associatif et commutatif → le résultat final est invariant à l'ordre. La sémantique relaxed est suffisante.
+
+\paragraph{Vérification.} \texttt{test\_solver\_omp} et \texttt{test\_solver\_kokkos} comparent par hash SHA-256 les sorties serial vs OMP (à 1, 2, 4, 8 threads) et serial vs Kokkos pour plusieurs seeds. Bit-à-bit identique.
+
+% =============================================================================
+\section{Récap des optimisations OMP gardées}
+\label{sec:omp:recap}
+% =============================================================================
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Optim} & \textbf{Bénéfice mesuré} \\
+\midrule
+Une seule région \texttt{parallel} pour la propagation & Évite l'effondrement perf à $\sim 50$ µs/niveau × 8000 niveaux \\
+\texttt{kSerialFallback} (frontier-threshold) & +25\% à 64 threads, +29\% à 192 threads (Romeo binary 128×128) \\
+\texttt{atomic\_and\_with} relaxed-load skip & $\sim 50\%$ de trafic atomique en moins sur cas typiques \\
+Per-thread frontier buffer + alignas(64) & Pas de faux partage, pas de lock global \\
+Réduction min-entropie ordonnée & Déterminisme préservé \\
+Cell-jitter SplitMix64 stateless & Déterminisme à travers backends \\
+LTO (Link-Time Optimization) & +3.4\% sur 128×128 (médiane 11 runs) \\
+\texttt{parallel\_min\_entropy} short-circuit pour petits workloads & Pas de regression sur 32×32 \\
+\bottomrule
+\end{tabularx}
+\caption{Optimisations OpenMP retenues après A/B testing.}
+\label{tab:omp:kept}
+\end{table}

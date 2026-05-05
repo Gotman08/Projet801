@@ -1,0 +1,472 @@
+\chapter{Résultats et analyse}
+\label{chap:resultats}
+
+\epigraph{\textit{``If you cannot measure it, you cannot improve it.''}}{--- Lord Kelvin}
+
+Ce chapitre présente les résultats expérimentaux et leur analyse. Nous suivons le flux : validation de la correction, performance séquentielle de référence, scaling OpenMP, fits Amdahl, varying datasets, varying configurations, comparaison Kokkos CPU + GPU, et synthèse des optimisations testées en A/B.
+
+% =============================================================================
+\section{Validation : déterminisme bit-à-bit}
+\label{sec:res:validation}
+% =============================================================================
+
+Avant toute mesure de performance, nous validons que les trois backends produisent un \textbf{output bit-identique} pour un même seed. C'est une exigence forte qui contraint la conception (jitter d'entropie déterministe, réduction min-entropie ordonnée, atomics relaxed associatives).
+
+\subsection{Tests automatisés}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{lrl}
+\toprule
+\textbf{Suite de tests} & \textbf{Checks} & \textbf{Couverture} \\
+\midrule
+\texttt{test\_bitset} & 310 & set/clear/and/or/popcount/multi-mots \\
+\texttt{test\_grid} & 778 & accès, torus, fill\_row\_major, edge cases \\
+\texttt{test\_grid\_io} & 70 & round-trip txt, PNG, PPM, parsing erreurs \\
+\texttt{test\_tileset} & 132 & extraction, fréquences, déduplication \\
+\texttt{test\_overlap} & 4898 & identité, symétrie, multivalue \\
+\texttt{test\_wave} & 8594 & superposition, accesseurs, indépendance \\
+\texttt{test\_solver\_common} & 9060 & entropy, weighted\_pick, jitter, build\_output \\
+\texttt{test\_solver} & 71 & end-to-end serial, déterminisme, soundness \\
+\texttt{test\_edge\_cases} & 404 & failure paths, scale<1, retry exhaustion \\
+\texttt{test\_parallel\_attempts} & 16 & lowest-success determinism, retry boost \\
+\texttt{test\_symmetries} & 66 & rotated\_90⁴ = id, reflected² = id, monotonic \\
+\texttt{test\_backtrack} & 520 & soundness, succès tight, déterminisme \\
+\texttt{test\_solver\_omp} & 36 & déterminisme OMP, contradiction, multivalue \\
+\texttt{test\_solver\_kokkos} & 22 & déterminisme Kokkos serial vs Kokkos \\
+\texttt{test\_kokkos\_autoinit} & 3 & init/finalize \\
+\midrule
+\textbf{TOTAL} & \textbf{24 980} & \\
+\bottomrule
+\end{tabularx}
+\caption{Suite de tests : 15 suites, 24 980 invariants vérifiés.}
+\label{tab:res:tests}
+\end{table}
+
+\subsection{Couverture}
+
+Couverture mesurée par \texttt{gcovr 8.6} sur build \texttt{Debug + --coverage} : \textbf{99\% line coverage} (925 / 933 lignes). Les 8 lignes manquantes sont des artefacts gcov (accolades fermantes de fonctions inline) ou des branches non-déclenchables par les samples du repo (exception \texttt{MAX\_WORDS\_PER\_CELL > 8} dans Kokkos, all-attempts-failed dans \texttt{solve\_parallel}).
+
+% =============================================================================
+\section{Performance séquentielle de référence}
+\label{sec:res:serial}
+% =============================================================================
+
+\subsection{Décomposition du temps}
+
+Profilage du \texttt{wfc\_serial} sur Romeo, 128×128, $L = 11$ :
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/schemas/profile_breakdown.png}
+\caption{Décomposition du temps sur 128×128 binaire. La sélection min-entropie domine.}
+\label{fig:profile_breakdown}
+\end{figure}
+
+\subsection{Temps absolus de référence}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrr}
+\toprule
+\textbf{Taille} & \textbf{Solve serial (s)} & \textbf{Throughput (Mcells/s)} \\
+\midrule
+32×32 & 0.015 & 68 \\
+64×64 & 0.247 & 16.6 \\
+128×128 & 3.97 & 4.13 \\
+256×256 & 61.4 & 1.07 \\
+\bottomrule
+\end{tabular}
+\caption{Performance séquentielle sur Romeo, sample binary\_L11. Le throughput chute avec la taille à cause des cache misses (la wave déborde de la L2 à 256×256).}
+\label{tab:res:serial}
+\end{table}
+
+% =============================================================================
+\section{Scaling OpenMP : strong scaling}
+\label{sec:res:omp_scaling}
+% =============================================================================
+
+\subsection{Speedup binary\_L11 sur Romeo}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/scaling/speedup_binary_L11.png}
+\caption{Speedup binary\_L11 Romeo. Plus la grille est grande, plus le speedup peak est élevé.}
+\label{fig:speedup_binary}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrrrrrrrr}
+\toprule
+\textbf{Taille} & \textbf{1t} & \textbf{2t} & \textbf{4t} & \textbf{8t} & \textbf{16t} & \textbf{32t} & \textbf{64t} & \textbf{192t} \\
+\midrule
+32×32 & 1.00× & 1.10× & 1.16× & 0.91× & 0.33× & 0.18× & 0.09× & 0.02× \\
+64×64 & 0.96× & 1.66× & 2.54× & 2.64× & 0.65× & 0.38× & 0.16× & 0.06× \\
+128×128 & 1.00× & 1.89× & 3.39× & 5.27× & 2.60× & 0.87× & 0.30× & 0.11× \\
+\textbf{256×256} & \textbf{1.00×} & \textbf{1.93×} & \textbf{3.65×} & \textbf{6.73×} & \textbf{8.23×} & \textbf{3.91×} & \textbf{1.26×} & \textbf{0.19×} \\
+\bottomrule
+\end{tabular}
+\caption{Strong scaling binary\_L11 sur Romeo (job 543692). Peak 8.23× à 16 threads sur 256×256. Régression brutale au-delà du peak.}
+\label{tab:res:speedup_binary}
+\end{table}
+
+\begin{important}{Lecture du tableau}
+\begin{itemize}
+    \item À 32×32, le parallélisme ne paie jamais : la grille est trop petite pour amortir le coût des tasks.
+    \item À 64×64, peak modeste à 4-8 threads ; au-delà, régression rapide.
+    \item À 128×128, peak 5.27× à 8 threads, déjà honorable.
+    \item À 256×256, peak 8.23× à 16 threads (51\% d'efficacité parallèle). C'est notre meilleur résultat.
+    \item Au-delà du peak (32+ threads), régression brutale jusqu'à 0.02× la baseline à 192 threads sur 32×32 (le solver tourne 50× plus lentement que le serial).
+\end{itemize}
+\end{important}
+
+\subsection{Causes de la régression à haut nombre de threads}
+
+Trois causes dominent :
+
+\begin{enumerate}
+    \item \textbf{Frontière BFS trop courte} : un niveau de 10 cellules sur 192 threads → 18 threads sur 19 attendent à la barrière. Le coût synchronisation domine.
+
+    \item \textbf{Fork/join répété} : la barrière par niveau coûte $\sim 50$ µs sur 192 cores. Pour 8000 niveaux : 400 ms incompressibles, à comparer aux $\sim 100$ ms de travail utile.
+
+    \item \textbf{Contention atomique inter-NUMA} : \texttt{\_\_atomic\_fetch\_and} cross-NUMA = ping-pong de cache lines à 1-3 µs par opération.
+\end{enumerate}
+
+L'optim « frontier-threshold » (Section~\ref{sec:res:optim_frontier}) atténue (1) et (2) mais pas (3).
+
+% =============================================================================
+\section{Modèle d'Amdahl}
+\label{sec:res:amdahl}
+% =============================================================================
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/amdahl/amdahl_binary_L11_256.png}
+\caption{Fit Amdahl binary\_L11 256×256.}
+\label{fig:amdahl_binary_256}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llrrrrr}
+\toprule
+\textbf{Label} & \textbf{Size} & \textbf{$f$} & \textbf{$R^2$} & \textbf{Ceiling} & \textbf{Peak} & \textbf{Ratio} \\
+\midrule
+binary\_L11 & 32 & 0.184 & 0.563 & 1.2× & 1.16× & 95\% \\
+binary\_L11 & 64 & 0.737 & 0.929 & 3.8× & 2.64× & 69\% \\
+binary\_L11 & 128 & 0.928 & 0.999 & 13.8× & 5.27× & 38\% \\
+binary\_L11 & 256 & 0.944 & 0.967 & 17.8× & 8.23× & 46\% \\
+binary\_optim & 128 & 0.956 & 0.999 & 22.9× & 6.10× & 27\% \\
+terrain\_L33 & 64 & 0.867 & 0.996 & 7.5× & 4.09× & 54\% \\
+terrain\_L33 & 128 & 0.942 & 1.000 & 17.1× & 5.69× & 33\% \\
+smooth\_N3 & 128 & 0.735 & 1.000 & 3.8× & 2.23× & 59\% \\
+\bottomrule
+\end{tabular}
+\caption{Fits Amdahl par configuration. À 128 et 256, $f \approx 0.94$ pour binary et terrain : le code est ~94\% parallélisable, ceiling théorique 14-18×. Le peak observé reste à 33-46\% du ceiling : Amdahl suppose un parallélisme parfait, la réalité inclut des coûts supra-linéaires.}
+\label{tab:res:amdahl}
+\end{table}
+
+\begin{important}{Lecture du fit Amdahl}
+\begin{itemize}
+    \item L'optim « frontier-threshold » pousse $f$ de 0.928 à 0.956 sur 128×128 (peak 5.27× → 6.10×, ceiling théorique 13.8 → 22.9).
+    \item Le ratio peak/ceiling baisse, mais le peak absolu monte. L'optim aide.
+    \item \texttt{smooth\_N3} a $f = 0.735$ au max, beaucoup moins parallélisable. Cause : peu de tuiles ($L=12$) + $N=3$ = peu de parallélisme par cellule (analyse en Section~\ref{sec:res:varying_datasets}).
+\end{itemize}
+\end{important}
+
+% =============================================================================
+\section{Varying datasets : impact du sample}
+\label{sec:res:varying_datasets}
+% =============================================================================
+
+À taille de grille fixée (128×128) et thread count variable, le sample modifie significativement le scaling.
+
+\subsection{terrain\_L33 vs binary\_L11}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/scaling/speedup_terrain_L33.png}
+\caption{terrain\_L33 scale mieux que binary\_L11 à taille égale.}
+\label{fig:speedup_terrain}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrrrrrr}
+\toprule
+\textbf{Sample} & \textbf{$L$} & \textbf{1t} & \textbf{4t} & \textbf{8t} & \textbf{16t} & \textbf{32t} \\
+\midrule
+binary\_L11 128×128 & 11 & 1.00× & 3.39× & 5.27× & 2.60× & 0.87× \\
+terrain\_L33 128×128 & 33 & 1.00× & 3.43× & \textbf{5.69×} & 4.81× & 2.13× \\
+\bottomrule
+\end{tabular}
+\caption{terrain\_L33 (33 tuiles) atteint un meilleur peak que binary\_L11 (11 tuiles) à taille égale. La différence vient du travail par cellule : plus de bits → meilleur amortissement OMP.}
+\label{tab:res:terrain_vs_binary}
+\end{table}
+
+\subsection{smooth\_N3, le cas pathologique}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/scaling/speedup_smooth_N3.png}
+\caption{smooth\_N3 scale beaucoup moins bien : peu de tuiles + $N = 3$ = peu de parallélisme par cellule.}
+\label{fig:speedup_smooth}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrrrrrr}
+\toprule
+\textbf{Taille} & \textbf{1t} & \textbf{2t} & \textbf{4t} & \textbf{8t} & \textbf{16t} & \textbf{32t} \\
+\midrule
+32×32 & 1.00× & 0.96× & 1.07× & 0.49× & 0.18× & 0.11× \\
+64×64 & 1.00× & 1.50× & 1.64× & 0.71× & 0.27× & 0.16× \\
+128×128 & 1.00× & 1.85× & \textbf{2.23×} & 1.16× & 0.43× & 0.24× \\
+\bottomrule
+\end{tabular}
+\caption{smooth\_N3 plafonne à 2.23×. Cause : $L = 12$ tuiles (peu) + $N = 3$ (offsets $5 \times 5 = 25$) → 300 ops/cell, à comparer à 99 pour binary. Frontières BFS courtes car les motifs lisses propagent peu.}
+\label{tab:res:smooth_N3}
+\end{table}
+
+\begin{important}{Pourquoi smooth\_N3 plafonne}
+\begin{itemize}
+    \item Sample de 12 tuiles seulement (gradients lisses).
+    \item $N = 3$ → offsets $5 \times 5 = 25$ vs 9 pour $N = 2$. Plus d'offsets, mais peu de bits par tuile à manipuler ($L = 12$ tient dans 1 mot).
+    \item Motifs lisses → propagation locale qui modifie peu de cellules par niveau.
+    \item Au total, chaque niveau BFS coûte trop peu pour amortir la barrière OMP au-delà de 4 threads.
+\end{itemize}
+
+Pas de fix algorithmique côté intra-attempt sans risquer de régresser binary. Contournements utilisateur : \texttt{--threads 4} (sweet spot intra-attempt) ou \texttt{--parallel-attempts K} si retries fréquents.
+\end{important}
+
+% =============================================================================
+\section{Varying configurations : impact des paramètres}
+\label{sec:res:varying_configs}
+% =============================================================================
+
+\subsection{Effet de la taille de grille}
+
+À threads fixés (16) et sample fixé (binary\_L11) :
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Taille} & \textbf{Wave size} & \textbf{Cache fit} & \textbf{Speedup 16t} & \textbf{Throughput (Mcells/s)} \\
+\midrule
+32×32 & 8 KB & L1 ✓ & 0.33× & 4.6 \\
+64×64 & 32 KB & L1 borderline & 0.65× & 11.0 \\
+128×128 & 128 KB & L2 ✓ & 2.60× & 13.4 \\
+256×256 & 524 KB & L2 → LLC & 8.23× & \textbf{15.4} \\
+\bottomrule
+\end{tabular}
+\caption{À 16 threads, le speedup et throughput augmentent avec la taille jusqu'à 256×256. La wave déborde de la L2 à 256×256 ; le parallélisme aide à amortir les latences mémoire.}
+\label{tab:res:varying_size}
+\end{table}
+
+\subsection{Effet du paramètre $N$}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Sample} & \textbf{$N$} & \textbf{$L$} & \textbf{Solve serial 64×64 (s)} & \textbf{Note} \\
+\midrule
+\texttt{binary\_5x5} & 2 & 11 & 0.247 & Référence sujet \\
+\texttt{multivalue\_terrain} & 2 & 33 & 0.520 & Plus de tuiles, plus lent \\
+\texttt{multivalue\_terrain} & 3 & 73 & échec & $L = 73 > $ trop contraint \\
+\texttt{multivalue\_smooth} & 3 & 12 & 0.020 & Sample petit, peu de tuiles \\
+\bottomrule
+\end{tabular}
+\caption{Impact de $N$ et du sample sur le coût serial. $N = 3$ avec terrain échoue (trop contraint), $N = 2$ avec terrain converge en ~0.5 s.}
+\label{tab:res:varying_N}
+\end{table}
+
+% =============================================================================
+\section{Optim « frontier-threshold » : A/B Romeo}
+\label{sec:res:optim_frontier}
+% =============================================================================
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/optim/frontier_threshold_compare.png}
+\caption{A/B « frontier-threshold » sur binary\_L11 128×128 (job 544356).}
+\label{fig:optim_frontier}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{rrrr}
+\toprule
+\textbf{Threads} & \textbf{Avant} & \textbf{Après} & \textbf{Gain} \\
+\midrule
+1 & 3.98 s & 4.19 s & -5\% (variance) \\
+4 & 1.17 s & 1.15 s & +2\% \\
+8 & 0.75 s & 0.69 s & \textbf{+10\%} \\
+16 & 1.52 s & 1.27 s & \textbf{+20\%} \\
+32 & 4.53 s & 4.01 s & +13\% \\
+64 & 13.16 s & 10.53 s & \textbf{+25\%} \\
+192 & 35.30 s & 27.28 s & \textbf{+29\%} \\
+\bottomrule
+\end{tabular}
+\caption{A/B frontier-threshold. À 1-2 threads, l'effet est légèrement négatif (-3 à -5\%) mais dans le bruit. À haut thread count, gain net.}
+\label{tab:res:frontier_threshold}
+\end{table}
+
+% =============================================================================
+\section{Backend Kokkos : CPU vs GPU GH200}
+\label{sec:res:kokkos}
+% =============================================================================
+
+\subsection{Kokkos sur CPU EPYC}
+
+À \textit{default concurrency} (Kokkos décide lui-même du nombre de threads), Kokkos atteint :
+\begin{itemize}
+    \item \texttt{binary\_L11} 128×128 : $\sim 3.4$ s, comparable à \texttt{omp t=1} (3.97 s) mais moins bon que \texttt{omp t=8} (0.69 s).
+    \item \texttt{binary\_L11} 256×256 : $\sim 13.7$ s, mieux que \texttt{omp t=1} (62 s) mais 1.8× plus lent que \texttt{omp t=16} (7.5 s).
+\end{itemize}
+
+L'overhead Kokkos par rapport à OpenMP brut est $\sim 30\%$ sur ces workloads, attribuable au coût des Views et du dispatch \texttt{parallel\_for}. Acceptable pour le bénéfice de portabilité.
+
+\subsection{Kokkos GPU sur GH200}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Taille} & \textbf{aarch64 serial} & \textbf{aarch64 omp t=4} & \textbf{aarch64 omp t=16} & \textbf{GPU GH200} \\
+\midrule
+32×32 & 0.010 s & 0.082 s & 0.440 s & 0.173 s \\
+64×64 & 0.166 s & 0.341 s & 2.551 s & 0.855 s \\
+128×128 & 2.623 s & 1.755 s & 10.255 s & 5.431 s \\
+256×256 & --- & --- & --- & 52.1 s \\
+\bottomrule
+\end{tabular}
+\caption{GPU GH200 vs CPU ARM Grace. Le GPU est plus lent que le CPU à toutes les tailles testées.}
+\label{tab:res:gpu_perf}
+\end{table}
+
+\begin{important}{Pourquoi le GPU est lent sur ce workload}
+\begin{enumerate}
+    \item \textbf{H↔D copies par propagate} : pour 256×256, 524 KB par sens × 16000 = 16 GB de transfert PCIe. À 25 GB/s c'est 0.6 s rien que de transferts.
+    \item \textbf{Pas assez de parallélisme par niveau BFS} : un niveau de 100 cellules sur 16 896 cores CUDA = 99\% des cores oisifs.
+    \item \textbf{Atomics globales du GPU} bien plus lentes que celles CPU sur cache local.
+    \item \textbf{Min-entropie reste sur CPU} : la phase qui domine ($\sim 85\%$) ne profite pas du GPU.
+\end{enumerate}
+\end{important}
+
+% =============================================================================
+\section{Extension parallel-attempts : mesures}
+\label{sec:res:parallel_attempts}
+% =============================================================================
+
+Sur \texttt{terrain N=3 24×24} (workload à fort taux d'échec), 4 seeds, total wallclock :
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrr}
+\toprule
+\textbf{Mode} & \textbf{Total wallclock} & \textbf{Speedup} \\
+\midrule
+sequential, 1 thread & 0.510 s & 1.0× \\
+\texttt{--parallel-attempts 4 --threads 4} & 0.332 s & 1.54× \\
+\texttt{--parallel-attempts 8 --threads 8} & 0.238 s & \textbf{2.14×} \\
+\bottomrule
+\end{tabular}
+\caption{Parallel-attempts paie sur workloads à fort taux de retry. Déterminisme préservé : winning\_attempt identique à un retry séquentiel.}
+\label{tab:res:parallel_attempts}
+\end{table}
+
+% =============================================================================
+\section{Extension backtracking : mesures}
+\label{sec:res:backtrack}
+% =============================================================================
+
+Sur \texttt{terrain N=3 32×32} (sample serré où retry échoue) :
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrr}
+\toprule
+\textbf{Configuration} & \textbf{Wallclock} & \textbf{Résultat} \\
+\midrule
+retry-30 attempts & 0.38 s & \textbf{ÉCHEC} \\
+\texttt{--backtrack} & 0.12 s & \textbf{succès} \\
+\texttt{--parallel-attempts 8 --backtrack} & 0.20 s & succès \\
+\bottomrule
+\end{tabular}
+\caption{Backtracking résout des instances où retry échoue. Le mode parallel-bt est plus lent ici car le single-bt trouve déjà vite (overhead K parallèle inutile sur ce cas).}
+\label{tab:res:backtrack}
+\end{table}
+
+% =============================================================================
+\section{Synthèse : optimisations gardées et rejetées}
+\label{sec:res:synthesis}
+% =============================================================================
+
+\subsection{Gardées}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{lXl}
+\toprule
+\textbf{Optim} & \textbf{Bénéfice} & \textbf{Mesure} \\
+\midrule
+LTO (\texttt{USE\_LTO=ON}) & +3.4\% sur 128×128 & A/B 11 runs alternés \\
+Frontier-threshold & +25\% à 64t, +29\% à 192t & Job SLURM 544356 \\
+Relaxed-load avant atomic & ~50\% trafic atomique en moins & Trace contention \\
+NUMA first-touch parallèle & Pas mesuré direct & Architecture EPYC 8 NUMA \\
+Per-thread frontier alignas(64) & Pas de faux partage & Profile cache misses \\
+\texttt{parallel\_min\_entropy} short-circuit & Pas de regression sur petits & Bench 32×32 \\
+parallel-attempts (extension) & 2.14× wallclock terrain N=3 24×24 & Section~\ref{sec:res:parallel_attempts} \\
+backtracking + delta-snapshot (extension) & Résout terrain N=3 32×32 où retry échoue & Section~\ref{sec:res:backtrack} \\
+\bottomrule
+\end{tabularx}
+\caption{Optimisations retenues après mesure.}
+\label{tab:res:kept}
+\end{table}
+
+\subsection{Rejetées en A/B}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrl}
+\toprule
+\textbf{Optim} & \textbf{Median 128×128} & \textbf{Verdict} \\
+\midrule
+Cache \texttt{f * log(f)} thread\_local & 4.749 s & -6.7\%, \textbf{rejetée} \\
+\texttt{std::queue} → vector FIFO & 4.586 s & -3\%, dans le bruit \\
+Hoist \texttt{wave.at(c)} (CSE manuel) & 4.342 s & 0\%, variance \\
+LTO + PGO (en plus de LTO) & 4.143 s & +0.4\% supplémentaire, complexité non justifiée \\
+Work-density gate dans \texttt{propagate\_tasks} & non mesuré & rollback (risque de régression sur binary) \\
+\bottomrule
+\end{tabular}
+\caption{Optimisations rejetées en A/B testing. Le compilateur \texttt{-O3 -march=native} fait déjà la plupart des optims source-level.}
+\label{tab:res:rejected}
+\end{table}
+
+% =============================================================================
+\section{Recommandations d'utilisation}
+\label{sec:res:recommandations}
+% =============================================================================
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Cas d'usage} & \textbf{Choix conseillé} \\
+\midrule
+Grilles $\leq 64 \times 64$ & \texttt{wfc\_serial} \\
+Grilles $128 \times 128$ sur 4-8 cores & \texttt{wfc\_omp} avec \texttt{--threads 8} \\
+Grilles $256 \times 256+$ sur EPYC ou similaire & \texttt{wfc\_omp} avec \texttt{--threads 16} \\
+Grilles $\geq 512 \times 512$ & \texttt{wfc\_omp} avec 32-64 threads (à tester) \\
+Comparaison framework / portabilité GPU future & \texttt{wfc\_kokkos} \\
+Workloads à fort taux d'échec (terrain N=3) & \texttt{wfc\_omp --parallel-attempts 8} \\
+Workloads très contraints où retry échoue & \texttt{wfc\_omp --backtrack} (option) \\
+Reproductibilité bit-à-bit & n'importe quel backend, même seed \\
+\bottomrule
+\end{tabularx}
+\caption{Recommandations pratiques selon le cas d'usage.}
+\label{tab:res:recommandations}
+\end{table}

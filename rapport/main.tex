@@ -1,0 +1,567 @@
+\documentclass[a4paper,12pt]{report}
+
+% Citation en début de chapitre
+\usepackage{epigraph}
+
+% Encodages et langue (XeLaTeX/LuaLaTeX natif UTF-8)
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+\else
+  \usepackage{fontspec}
+\fi
+\usepackage[french]{babel}
+\usepackage{csquotes}
+
+\usepackage[backend=biber]{biblatex}
+\addbibresource{references.bib}
+\usepackage{libertine}
+\usepackage{setspace}          % Added for \setstretch
+\usepackage{tabularx}
+
+% Mise en page
+\usepackage[margin=2.5cm, headheight=15pt]{geometry} % Marges du document
+
+% Python 
+\usepackage{pythonhighlight}
+
+\usepackage{fancybox} % Pour créer des cadres élégants
+
+
+% Inclusion d'images
+\usepackage{graphicx}          % Pour inclure des images
+
+% Ajout du package float pour le positionnement [H]
+\usepackage{float}
+
+% Bibliothèques pour les mathématiques
+\usepackage{amsmath} % Mathématiques avancées
+\usepackage{amssymb} % Symboles mathématiques
+\usepackage{amsfonts} % Polices mathématiques
+\usepackage{amsthm} % Définitions et théorèmes
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{amsmath, amsthm}
+% Configuration des définitions et théorèmes
+\newtheorem{definition}{Définition}[chapter] % Définitions numérotées par chapitre
+\newtheorem{theorem}{Théorème}[chapter] % Théorèmes numérotés par chapitre
+\newtheorem{example}{Exemple}[chapter] % Exemples numérotés par chapitre
+\newtheorem{remark}{Remarque}[chapter] % Remarques numérotées par chapitre
+
+
+\usepackage{xcolor}
+\definecolor{grey}{rgb}{0.5, 0.5, 0.5} % Définit la couleur grey
+
+% Couleurs personnalisées pour la page de garde
+\definecolor{burgundy}{HTML}{8e5e2d} % Couleur principale #4b0e20
+\definecolor{gold}{HTML}{4c1207} % Couleur secondaire #b29959
+
+% Configuration des couleurs pour les sections, sous-sections, etc.
+\usepackage{titlesec}
+\usepackage{subcaption}
+\usepackage{svg}
+\usepackage{wrapfig}
+
+
+% Personnalisation des titres de section en burgundy
+\titleformat{\section}
+  {\Large\bfseries\color{burgundy}}
+  {\thesection}
+  {1em}
+  {}
+
+\titleformat{\subsection}
+  {\large\bfseries\color{burgundy}}
+  {\thesubsection}
+  {1em}
+  {}
+
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{burgundy}}
+  {\thesubsubsection}
+  {1em}
+  {}
+
+% Hyperliens
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,            % Colore les liens
+    linkcolor=burgundy,         % Couleur des liens internes (ex. table des matières) - burgundy
+    citecolor=gold,             % Couleur des références bibliographiques - gold
+    filecolor=burgundy,         % Couleur des liens vers des fichiers locaux - burgundy
+    urlcolor=gold               % Couleur des URL - gold
+}
+
+
+
+
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{siunitx}
+\usepackage{subcaption}
+
+% En-têtes et pieds de page
+\usepackage{fancyhdr}          % Pour personnaliser les en-têtes et pieds de page
+\usepackage{lastpage}          % Pour référencer la dernière page
+
+% Configuration du package fancyhdr
+\pagestyle{fancy}
+\fancyhf{} % Efface tous les champs de l'en-tête et du pied de page
+
+% En-tête
+\lhead{\textbf{\color{burgundy}CHPS0701 : Algorithmique et Programmation Parallèle}} % En-tête à gauche
+\rhead{\textbf{\color{burgundy}M1 CHPS}} % En-tête à droite
+
+% Pied de page
+\lfoot{\textbf{\color{burgundy}Romain Despoullains}} % Pied de page à gauche
+\rfoot{\textbf{\color{burgundy}Page \thepage\ \color{burgundy}/ \color{burgundy}\pageref{LastPage}}} % Pied de page à droite
+
+% --- Personnalisation des lignes d'en-tête et de pied de page ---
+\renewcommand{\headrulewidth}{0.4pt} % Épaisseur de la ligne sous l'en-tête
+\renewcommand{\footrulewidth}{0.4pt} % Épaisseur de la ligne au-dessus du pied de page
+
+% Redéfinition de \headrule et \footrule pour changer leur couleur
+% On utilise \fancy@setcolor pour que la couleur soit correctement gérée par fancyhdr
+\makeatletter % Nécessaire pour utiliser des commandes avec @
+
+% Pour la ligne d'en-tête
+\renewcommand{\headrule}{%
+  \if@fancyplain\let\headrulewidth\plainheadrulewidth\fi
+  {\color{burgundy} % Définit la couleur de la règle
+  \hrule\@width\headwidth\@height\headrulewidth\vskip-\headrulewidth}
+  \if@fancyplain\let\headrulewidth\plainheadrulewidth\fi % Rétablit la valeur originale (important)
+}
+
+% Pour la ligne de pied de page
+\renewcommand{\footrule}{%
+  \if@fancyplain\let\footrulewidth\plainfootrulewidth\fi
+  \vskip-\footruleskip\vskip-\footrulewidth
+  {\color{burgundy} % Définit la couleur de la règle
+  \hrule\@width\headwidth\@height\footrulewidth\vskip\footruleskip} % Utilise \headwidth pour la largeur
+  \if@fancyplain\let\footrulewidth\plainfootrulewidth\fi % Rétablit la valeur originale
+}
+\makeatother
+% Ajouter les lignes sous l'en-tête et au-dessus du pied de page
+\renewcommand{\headrulewidth}{0.4pt} % Ligne sous l'en-tête
+\renewcommand{\footrulewidth}{0.4pt} % Ligne au-dessus du pied de page
+
+% Inclusion de code source (si nécessaire)
+\usepackage{listings}      % Inclusion de code source
+\usepackage{color}         % Couleurs
+
+
+\definecolor{lightgray}{gray}{0.95}
+\definecolor{darkgray}{gray}{0.4}
+\definecolor{purple}{rgb}{0.58,0,0.82}
+
+\lstdefinelanguage{bash}{
+  keywords={cd, ls, mkdir, rm, mv, cp, sudo, apt, grep, find, echo, cat, git, docker, cargo},
+  sensitive=true,
+  comment=[l]{\#},
+  morecomment=[l]{\#},
+  morestring=[b]",
+}
+
+\lstset{
+  language=bash,
+  basicstyle=\small\ttfamily,
+  backgroundcolor=\color{lightgray},
+  commentstyle=\color{darkgray}\itshape,
+  keywordstyle=\color{purple}\bfseries,
+  stringstyle=\color{blue},
+  breaklines=true,
+  breakatwhitespace=true,
+  frame=single,
+  showstringspaces=false,
+  tabsize=2,
+  captionpos=b,
+  extendedchars=true,
+  literate=
+    {├}{{\char"251C}}1
+    {─}{{\char"2500}}1
+    {└}{{\char"2514}}1
+    {│}{{\char"2502}}1
+}
+
+
+% Définition des couleurs pour la coloration syntaxique
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+% Configuration du package listings
+\definecolor{maroon}{cmyk}{0, 0.87, 0.68, 0.32}
+\definecolor{halfgray}{gray}{0.55}
+\definecolor{ipython_frame}{RGB}{207, 207, 207}
+\definecolor{ipython_bg}{RGB}{247, 247, 247}
+\definecolor{ipython_red}{RGB}{186, 33, 33}
+\definecolor{ipython_green}{RGB}{0, 128, 0}
+\definecolor{ipython_cyan}{RGB}{64, 128, 128}
+\definecolor{ipython_purple}{RGB}{170, 34, 255}
+
+\usepackage{listings}
+\lstset{
+    breaklines=true,
+    %
+    extendedchars=true,
+    literate=
+    {á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+    {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+    {à}{{\`a}}1 {è}{{\`e}}1 {ì}{{\`i}}1 {ò}{{\`o}}1 {ù}{{\`u}}1
+    {À}{{\`A}}1 {È}{{\'E}}1 {Ì}{{\`I}}1 {Ò}{{\`O}}1 {Ù}{{\`U}}1
+    {ä}{{\"a}}1 {ë}{{\"e}}1 {ï}{{\"i}}1 {ö}{{\"o}}1 {ü}{{\"u}}1
+    {Ä}{{\"A}}1 {Ë}{{\"E}}1 {Ï}{{\"I}}1 {Ö}{{\"O}}1 {Ü}{{\"U}}1
+    {â}{{\^a}}1 {ê}{{\^e}}1 {î}{{\^i}}1 {ô}{{\^o}}1 {û}{{\^u}}1
+    {Â}{{\^A}}1 {Ê}{{\^E}}1 {Î}{{\^I}}1 {Ô}{{\^O}}1 {Û}{{\^U}}1
+    {œ}{{\oe}}1 {Œ}{{\OE}}1 {æ}{{\ae}}1 {Æ}{{\AE}}1 {ß}{{\ss}}1
+    {ç}{{\c c}}1 {Ç}{{\c C}}1 {ø}{{\o}}1 {å}{{\r a}}1 {Å}{{\r A}}1
+    {€}{{\EUR}}1 {£}{{\pounds}}1,
+    %
+    literate=
+    *{+}{{{\color{ipython_purple}+}}}1
+    {-}{{{\color{ipython_purple}-}}}1
+    {*}{{{\color{ipython_purple}$^\ast$}}}1
+    {/}{{{\color{ipython_purple}/}}}1
+    {^}{{{\color{ipython_purple}\^{}}}}1
+    {?}{{{\color{ipython_purple}?}}}1
+    {!}{{{\color{ipython_purple}!}}}1
+    {\%}{{{\color{ipython_purple}\%}}}1
+    {<}{{{\color{ipython_purple}<}}}1
+    {>}{{{\color{ipython_purple}>}}}1
+    {|}{{{\color{ipython_purple}|}}}1
+    {\&}{{{\color{ipython_purple}\&}}}1
+    {~}{{{\color{ipython_purple}~}}}1
+    %
+    {==}{{{\color{ipython_purple}==}}}2
+    {<=}{{{\color{ipython_purple}<=}}}2
+    {>=}{{{\color{ipython_purple}>=}}}2
+    %
+    {+=}{{{+=}}}2
+    {-=}{{{-=}}}2
+    {*=}{{{$^\ast$=}}}2
+    {/=}{{{/=}}}2,
+    %
+%   identifierstyle=\color{red}\ttfamily,
+    commentstyle=\color{ipython_cyan}\ttfamily,
+    stringstyle=\color{ipython_red}\ttfamily,
+    keepspaces=true,
+    showspaces=false,
+    showstringspaces=false,
+    %
+    rulecolor=\color{ipython_frame},
+    frame=single,
+    frameround={t}{t}{t}{t},
+    framexleftmargin=6mm,
+    numbers=left,
+    numberstyle=\tiny\color{halfgray},
+    %
+    %
+    backgroundcolor=\color{ipython_bg},
+    %   extendedchars=true,
+    basicstyle=\scriptsize\ttfamily,
+    keywordstyle=\color{ipython_green}\ttfamily,
+    escapechar=@,
+}
+
+
+% Inclusion de PlantUML pour les schémas basiques
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows, positioning, calc, patterns, decorations.pathreplacing, matrix, fit, backgrounds}
+
+% Command for horizontal rule on title page
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+
+% Informations du document
+\title{Cours}
+\author{Université de Reims Champagne Ardennes \\ Despoullains Romain}
+\date{\\today}
+
+\usepackage{tcolorbox} % Pour les boîtes stylisées
+\tcbuselibrary{breakable} % Pour permettre les boîtes sur plusieurs pages
+
+\tcbset {
+  base/.style={
+    arc=0mm, 
+    bottomtitle=0.5mm,
+    boxrule=0mm,
+    colbacktitle=black!10!white, 
+    coltitle=black, 
+    fonttitle=\bfseries, 
+    left=2.5mm,
+    leftrule=1mm,
+    right=3.5mm,
+    title={#1},
+    toptitle=0.75mm, 
+  }
+}
+
+% Définition des couleurs
+\definecolor{brandblue}{rgb}{0.34, 0.7, 1}
+\definecolor{brandgreen}{rgb}{0.0, 0.8, 0.4}
+\definecolor{brandorange}{rgb}{1.0, 0.6, 0.0}
+\definecolor{brandred}{rgb}{0.9, 0.1, 0.2}
+
+\newtcolorbox{methode}[1]{
+  colframe=brandblue, 
+  base={#1}
+}
+
+\newtcolorbox{defi}[1]{
+  colframe=brandgreen,
+  base={#1}
+}
+
+\newtcolorbox{exemple}[1]{
+  colframe=brandorange,
+  base={#1}
+}
+
+\newtcolorbox{important}[1]{
+  colframe=brandred,
+  base={#1}
+}
+
+% Couleurs supplémentaires pour les encadrés
+\definecolor{brandpurple}{rgb}{0.5, 0.0, 0.5}
+\definecolor{brandteal}{rgb}{0.0, 0.5, 0.5}
+
+% Encadré pour les résultats importants
+\newtcolorbox{result}{
+  colframe=brandpurple,
+  colback=brandpurple!5,
+  arc=2mm,
+  boxrule=1pt,
+  left=3mm,
+  right=3mm,
+  top=2mm,
+  bottom=2mm,
+  fonttitle=\bfseries,
+  title={Résultat clé}
+}
+
+% Encadré pour les recommandations
+\newtcolorbox{recommendation}{
+  colframe=brandteal,
+  colback=brandteal!5,
+  arc=2mm,
+  boxrule=1pt,
+  left=3mm,
+  right=3mm,
+  top=2mm,
+  bottom=2mm,
+  fonttitle=\bfseries,
+  title={Recommandation}
+}
+
+% Packages for background image and graphics
+\usepackage{eso-pic}
+\usepackage{graphicx}
+\usepackage{tikz}
+%-----------------------------------------------------------------
+% Command to place a background image at 15% opacity
+%-----------------------------------------------------------------
+\newcommand\BackgroundPic{%
+  \begin{tikzpicture}[remember picture,overlay]
+    % The node has "opacity=0.15" to set the entire image at 15% visibility.
+    \node[opacity=0.20] at (current page.center){%
+      \includegraphics[
+        width=\paperwidth,       % fill horizontally
+        height=\paperheight,     % fill vertically
+        keepaspectratio          % preserve aspect ratio
+      ]{assets/back.png}    % <-- cover_background.png
+    };
+  \end{tikzpicture}%
+}
+
+% Configuration des chapitres avec fncychap (style Bjornstrup personnalisé)
+\usepackage[Bjornstrup]{fncychap}
+
+% Commandes de couleur personnalisées pour fncychap
+\newcommand{\colortitlechap}{\color{gold}} % couleur du titre de chapitre en gold
+\newcommand{\colornumberchap}{\color{gold}} % couleur du numéro de chapitre en gold
+\newcommand{\colorbackchap}{\colorbox{burgundy}} % couleur de fond des règles en burgundy
+
+\makeatletter
+
+\renewcommand{\DOCH}{
+    \settowidth{\py}{\CNoV\thechapter}
+    \addtolength{\py}{-10pt}% 
+    \fboxsep=0pt%
+    \colorbackchap{\rule{0pt}{40pt}\parbox[b]{\textwidth}{\hfill}}%
+    \kern-\py\raise20pt%
+    \hbox{\colornumberchap\CNoV\thechapter}\\%
+}
+
+\renewcommand{\DOTI}[1]{%
+    \nointerlineskip\raggedright%
+    \fboxsep=\myhi%
+    \vskip-1ex%
+    \colorbackchap{\parbox[t]{\mylen}{\CTV\FmTi{\color{gold}#1}}}\par\nobreak%
+    \vskip 40\p@%
+}
+
+\renewcommand{\DOTIS}[1]{%
+    \fboxsep=0pt%
+    \colorbackchap{\rule{0pt}{40pt}\parbox[b]{\textwidth}{\hfill}}\\%
+    \nointerlineskip\raggedright%
+    \fboxsep=\myhi%
+    \colorbackchap{\parbox[t]{\mylen}{\CTV\FmTi{\color{gold}#1}}}\par\nobreak%
+    \vskip 40\p@%
+}
+
+\makeatother
+
+\author{DESPOULLAINS ROMAIN}
+
+\begin{document}
+
+% Title page with background image
+\begin{titlepage}
+    \BackgroundPic % Add the background image
+
+    % === LOGOS EN HAUT ===
+
+    \noindent
+
+    \begin{minipage}[t]{0.45\textwidth}
+        \raggedright
+        \includegraphics[width=4cm]{assets/logo-urca.png} 
+    \end{minipage}%
+    \hfill
+    \begin{minipage}[t]{0.45\textwidth}
+        \raggedleft
+        \includegraphics[width=5.3cm]{assets/logo.jpg}
+    \end{minipage}    
+
+      \vspace*{2.5cm}
+
+    % === TITRE PRINCIPAL AVEC BARRES HARMONISÉES ===
+    \centering
+    {\color{gold}\rule{0.6\textwidth}{1pt}}\\[0.5cm]
+    {\fontsize{22}{26}\selectfont \bfseries \color{burgundy} Rapport Projet}\\[0.5cm]
+    {\color{gold}\rule{0.6\textwidth}{1pt}}\\[1.5cm]% === SOUS-TITRES DE PROJET ===
+    \begin{minipage}{0.85\textwidth}
+        \centering
+        {\Large \textbf{Wave Function Collapse, modèle overlapping}}\\[0.3cm]
+        {\large Approches Séquentielle, OpenMP et Kokkos (CPU + GPU)}\\[0.5cm]
+    \end{minipage}
+
+    \vspace*{7cm}
+
+    % === INFORMATIONS PERSONNELLES ET ACADÉMIQUES ===
+    \begin{minipage}{0.6\textwidth}
+        \centering        \begin{tabular}{r l}
+            \textbf{Auteur} & : \textit{M. Despoullains} \\
+        \end{tabular}
+    \end{minipage}
+
+    \vspace*{2cm}    % === FILIÈRE ET ANNÉE ===
+
+    {\footnotesize \textcolor{gray}{Université de Reims Champagne-Ardenne}}\\[0.2cm]
+    {\footnotesize \textcolor{gray}{CHPS0701 : Algorithmique et Programmation Parallèle}}\\[0.2cm]
+    {\footnotesize \textcolor{gray}{2025 - 2026}}
+
+    \vspace*{1cm}
+\end{titlepage}
+\clearpage % Ensures that content following the title page starts on a new page
+
+% === RÉSUMÉ EN FRANÇAIS ===
+\chapter*{Résumé}
+\addcontentsline{toc}{chapter}{Résumé}
+
+Ce rapport présente l'implémentation et l'optimisation de l'algorithme \textbf{Wave Function Collapse} (WFC, Maxim Gumin, 2016) dans son modèle \textit{overlapping}. Le problème consiste à générer une grille $G$ qui « ressemble localement » à un échantillon $S$ donné, c'est-à-dire dont tout sous-bloc $N \times N$ apparaît au moins une fois dans $S$. \\
+
+Nous développons d'abord une version séquentielle de référence basée sur trois primitives : extraction de tuiles toroïdale, compatibilité par bitsets packés sur \texttt{uint64\_t}, et propagation BFS niveau-synchrone. L'algorithme est ensuite parallélisé via \textbf{OpenMP} avec l'API \texttt{\#pragma omp task} explicite (sélection min-entropie chunked, propagation BFS multi-niveaux), puis porté sur \textbf{Kokkos} pour cibler les architectures CPU et GPU (CUDA) sans duplication de code. \\
+
+Les benchmarks sur le supercalculateur \textbf{Romeo} (AMD EPYC 9654, 192 cœurs, 8 nœuds NUMA) atteignent un speedup peak de \textbf{8.23×} à 16 threads sur grille 256×256. Trois extensions opt-in sont livrées et étudiées : symétries D4, backtracking avec snapshot delta-encodé, et exécution de K attempts WFC indépendants en parallèle. Une démonstration sur \textbf{Unreal Engine 5} ferme le projet. \\
+
+\textbf{Mots-clés :} Wave Function Collapse, génération procédurale, OpenMP \texttt{task}, Kokkos, GPU CUDA, déterminisme, calcul haute performance. \\
+
+% === ABSTRACT EN ANGLAIS ===
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+This report presents the implementation and optimization of the \textbf{Wave Function Collapse} (WFC, Maxim Gumin, 2016) algorithm in its \textit{overlapping} model. The problem is to generate a grid $G$ that locally resembles a given sample $S$: every $N \times N$ sub-block of $G$ must appear at least once in $S$. \\
+
+We start from a serial reference using three core primitives: toroidal tile extraction, compatibility tables stored as packed \texttt{uint64\_t} bitsets, and level-synchronous BFS propagation. The algorithm is then parallelized using \textbf{OpenMP} with the explicit \texttt{\#pragma omp task} API (chunked min-entropy reduction and multi-level BFS), and ported to \textbf{Kokkos} to target both CPU and GPU (CUDA) backends without code duplication. \\
+
+Benchmarks on the \textbf{Romeo} supercomputer (AMD EPYC 9654, 192 cores, 8 NUMA nodes) reach a peak speedup of \textbf{8.23×} at 16 threads on a 256×256 grid. Three opt-in extensions are delivered and analyzed: D4 symmetries, delta-encoded backtracking, and K independent WFC attempts running in parallel. An \textbf{Unreal Engine 5} demonstration closes the project. \\
+
+\textbf{Keywords:} Wave Function Collapse, procedural generation, OpenMP \texttt{task}, Kokkos, CUDA GPU, determinism, high-performance computing. \\
+
+% === TABLE DES MATIÈRES ===
+\tableofcontents
+\clearpage
+
+% === LISTE DES FIGURES ===
+\listoffigures
+\addcontentsline{toc}{chapter}{Liste des figures}
+\clearpage
+
+% === LISTE DES TABLEAUX ===
+\listoftables
+\addcontentsline{toc}{chapter}{Liste des tableaux}
+\clearpage
+
+% =============================================================================
+% INCLUSION DES CHAPITRES
+% =============================================================================
+
+% Chapitre 1 : Introduction
+\input{chapters/introduction}
+
+% Chapitre 2 : Préliminaires
+\input{chapters/preliminaires}
+
+% Chapitre 3 : Problème WFC (modèle overlapping)
+\input{chapters/probleme_wfc}
+
+% Chapitre 4 : Approche algorithmique séquentielle
+\input{chapters/approche_algorithmique_sequentielle}
+
+% Chapitre 5 : Implémentation C++ et ingénierie logicielle
+\input{chapters/implementation_cpp_ingenierie_logicielle}
+
+% Chapitre 6 : Parallélisation OpenMP
+\input{chapters/parallelisation_openmp}
+
+% Chapitre 7 : Parallélisation Kokkos et portabilité GPU
+\input{chapters/parallelisation_kokkos_gpu}
+
+% Chapitre 8 : Extensions algorithmiques (symétries, backtracking, parallel attempts)
+\input{chapters/extensions_algorithmiques}
+
+% Chapitre 9 : Protocole expérimental (benchmarking)
+\input{chapters/protocole_experimental_benchmarking}
+
+% Chapitre 10 : Résultats et analyse
+\input{chapters/resultats_et_analyse}
+
+% Chapitre 11 : Limites et perspectives
+\input{chapters/limites_et_perspectives}
+
+% Chapitre 12 : Conclusion
+\input{chapters/conclusion}
+
+% =============================================================================
+% ANNEXES
+% =============================================================================
+\input{chapters/annexes}
+
+% =============================================================================
+% BIBLIOGRAPHIE
+% =============================================================================
+\printbibliography[heading=bibintoc, title={Références bibliographiques}]
+
+\vfill
+
+\begin{center}
+\textit{Fin du rapport}
+\end{center}
+
+\end{document}

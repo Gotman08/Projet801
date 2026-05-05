@@ -1,0 +1,231 @@
+\chapter{Approche algorithmique séquentielle}
+\label{chap:approche}
+
+\epigraph{\textit{``The art of programming is the art of organizing complexity.''}}{--- Edsger W. Dijkstra}
+
+Ce chapitre détaille l'algorithme WFC tel que nous l'avons implémenté en série. Il sert de référence pour les chapitres parallèles : les versions OpenMP et Kokkos partagent exactement la même logique, seuls les schémas d'orchestration diffèrent.
+
+\section{Les six étapes de WFC}
+
+L'algorithme WFC se résume en six étapes, alignées sur la formulation de Gumin \cite{gumin2016wfc} et la présentation pédagogique de Heaton \cite{heaton2018wfc}.
+
+\begin{algorithm}[H]
+\caption{Wave Function Collapse séquentiel}
+\begin{algorithmic}[1]
+\Require Échantillon $S$, taille de tuile $N$, dimensions sortie $(r, c)$, seed
+\Ensure Grille $G$ ou échec
+\State $T, \text{freq} \gets \textsc{ExtraireTuiles}(S, N)$
+\State $R \gets \textsc{ConstruireRègles}(T, N)$
+\State $W \gets \textsc{InitWave}(r, c, |T|)$ \Comment{toutes tuiles candidates partout}
+\State $\text{rng} \gets \textsc{Mt19937}(\text{seed})$
+\Loop
+    \State $\text{cell} \gets \arg\min_c \textsc{Entropy}(W[c]) + \textsc{Jitter}(c, \text{seed})$
+    \If{$\text{cell} = -1$}
+        \State \Return \textsc{BuildOutput}($W$, $T$) \Comment{succès}
+    \EndIf
+    \State $t \gets \textsc{WeightedPick}(W[\text{cell}], \text{freq}, \text{rng})$
+    \State $W[\text{cell}] \gets \{t\}$ \Comment{collapse}
+    \If{$\neg \textsc{Propagate}(W, R, \text{cell})$}
+        \State \Return $\bot$ \Comment{contradiction}
+    \EndIf
+\EndLoop
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Étape 1 : Extraction des tuiles}
+
+\begin{definition}[Extraction toroïdale]
+Pour chaque position $(r_0, c_0) \in [0, r_S) \times [0, c_S)$ de l'échantillon, on lit $N \times N$ valeurs avec wrap-around :
+\[
+\text{tile}[i][j] = S[(r_0 + i) \bmod r_S][(c_0 + j) \bmod c_S]
+\]
+\end{definition}
+
+L'algorithme accumule les tuiles dans une \texttt{unordered\_map<Tile, int>} pour dédupliquer en $O(1)$ amorti par hash FNV-1a. Pour chaque tuile rencontrée, sa fréquence est incrémentée. Le résultat : un vecteur $T$ des tuiles uniques et un vecteur \texttt{freq} parallèle.
+
+\paragraph{Choix toroïdal vs non-toroïdal.} Le sujet ne précise pas la convention. Nous choisissons \textbf{toroïdal} pour deux raisons :
+\begin{itemize}
+    \item Chaque pixel apparaît exactement dans $N \times N$ tuiles, distribution uniforme.
+    \item Le nombre total de tuiles extraites vaut $r_S \times c_S$ (et non $(r_S - N + 1) \times (c_S - N + 1)$), ce qui évite les biais de bord.
+\end{itemize}
+
+C'est aussi le choix de l'implémentation référence de Gumin. Pour l'exemple du sujet ($5 \times 5$ binaire avec $N = 2$), l'extraction toroïdale identifie 11 tuiles uniques (vs 8 en non-toroïdal). Tests \texttt{test\_tileset} valident ces 11 tuiles bit-à-bit.
+
+\subsection{Étape 2 : Pré-calcul des règles d'adjacence}
+
+Pour chaque paire de tuiles $(t_1, t_2)$ et chaque offset $(dx, dy) \in [-(N-1), N-1]^2$, on calcule un booléen : « $t_2$ est-elle compatible avec $t_1$ au décalage $(dx, dy)$ ? ». Le résultat est stocké comme \textbf{bitset} indexé par identifiant de tuile.
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering
+Voir \texttt{schemas/overlap\_compatibility.md} pour le prompt de génération.\\
+Diagramme d'overlap pour $N = 2$ : deux tuiles $2 \times 2$ partageant une zone de $1 \times 2$ à l'offset $(1, 0)$, avec encadrement de la condition de compatibilité.
+}}
+\caption{Convention d'overlap : $t_2$ placée à $(dx, dy)$ de $t_1$, les valeurs doivent coïncider sur la zone de recouvrement.}
+\label{fig:overlap_compatibility}
+\end{figure}
+
+Le stockage est plat : un \texttt{vector<Bitset>} de taille $L \cdot (2N-1)^2$, indexé par
+\[
+\text{rule\_idx}(t, dx, dy) = t \cdot (2N-1)^2 + (dx + N - 1) \cdot (2N-1) + (dy + N - 1)
+\]
+
+\paragraph{Coût.} $L^2 \times (2N-1)^2$ paires à tester, chaque test en $O(N^2)$. Pour le sample du sujet ($L = 11$, $N = 2$) : $\sim 5000$ comparaisons, exécutées en quelques µs. Pour $L = 73$, $N = 3$ : $\sim 500\,000$ comparaisons, encore quelques ms. Cette construction est parallélisée en OpenMP via \texttt{\#pragma omp parallel for} sur la boucle externe (gain $\sim 2\times$ sur 8 cores).
+
+\subsection{Étape 3 : Initialisation de la Wave}
+
+Chaque cellule $(r, c)$ de la grille de sortie reçoit le bitset \textbf{plein} (toutes les $L$ tuiles candidates). Le constructeur de \texttt{Wave} fait un \textit{first-touch parallèle} (\texttt{\#pragma omp parallel for} sur l'init) pour mapper les pages physiques sur le nœud NUMA des threads consommateurs.
+
+\subsection{Étape 4 : Sélection min-entropie}
+
+\begin{definition}[Entropie de Shannon pondérée]
+Pour une cellule $c$ dont l'ensemble de candidats restants est $W[c]$, l'entropie est :
+\[
+H(c) = \log\left(\sum_{t \in W[c]} f_t\right) - \frac{\sum_{t \in W[c]} f_t \log f_t}{\sum_{t \in W[c]} f_t}
+\]
+où $f_t$ est la fréquence de la tuile $t$ dans $S$.
+\end{definition}
+
+L'algorithme choisit la cellule de moindre entropie (cellule la plus contrainte). Pour départager les ex-aequo (très fréquents en début de résolution quand toutes les cellules ont la même entropie), on ajoute un \textbf{bruit déterministe} :
+\[
+H'(c) = H(c) + \text{jitter}(c, \text{seed})
+\]
+où \texttt{jitter} est un hash SplitMix64 de $(c, \text{seed})$ produisant une valeur dans $[0, 10^{-6})$. Ce bruit est \textbf{stateless} : il ne consomme pas l'état du RNG, ce qui garantit le déterminisme à travers les backends parallèles (voir Chapitre~\ref{chap:openmp}).
+
+\subsection{Étape 5 : Tirage pondéré et collapse}
+
+Une fois la cellule choisie, on tire une tuile selon les fréquences :
+\begin{enumerate}
+    \item Calculer la somme $S = \sum_{t \in W[\text{cell}]} f_t$
+    \item Tirer $u \sim \mathcal{U}(0, S)$
+    \item Parcourir les candidats par ordre croissant de $t$, accumuler la CDF, retourner le premier $t$ tel que $\text{CDF}(t) \geq u$.
+\end{enumerate}
+
+\texttt{wave[cell].set\_only(t)} réduit le bitset à un seul bit (force la collapse).
+
+\subsection{Étape 6 : Propagation BFS}
+
+\begin{algorithm}[H]
+\caption{Propagation BFS niveau-synchrone}
+\begin{algorithmic}[1]
+\Require Wave $W$, règles $R$, cellule de départ $c_0$
+\Ensure $\bot$ si contradiction, $\top$ sinon
+\State $Q \gets \{c_0\}$
+\While{$Q \neq \emptyset$}
+    \State $c \gets Q.\textsc{Pop}()$
+    \For{chaque offset $(dx, dy) \in [-(N-1), N-1]^2 \setminus \{(0,0)\}$}
+        \State $nc \gets \textsc{Voisin}(c, dx, dy)$
+        \State $A \gets \bigcup_{t \in W[c]} R(t, dx, dy)$ \Comment{union des compatibilités}
+        \State $\text{changed} \gets W[nc] \gets W[nc] \cap A$ \Comment{intersection bitwise}
+        \If{$\text{changed}$}
+            \If{$W[nc] = \emptyset$}
+                \State \Return $\bot$ \Comment{contradiction}
+            \EndIf
+            \State $Q.\textsc{Push}(nc)$
+        \EndIf
+    \EndFor
+\EndWhile
+\State \Return $\top$
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Variante \texttt{for\_each\_set} optimisée.} L'union $A$ se calcule en énumérant les bits actifs de $W[c]$ via \texttt{\_\_builtin\_ctzll} (count trailing zeros). Pour chaque bit actif, on \texttt{or\_with} la règle correspondante. Beaucoup plus rapide que tester chaque bit en $O(L)$.
+
+% =============================================================================
+\section{Stratégies de récupération sur contradiction}
+\label{sec:approche:retry}
+% =============================================================================
+
+\subsection{Restart-on-contradiction (défaut)}
+
+Quand \texttt{propagate} retourne $\bot$, l'algorithme retourne \texttt{false} pour le \texttt{run\_attempt} courant. La boucle \texttt{solve()} retente avec un nouveau seed dérivé :
+\[
+\text{seed}_k = \text{seed}_{\text{base}} + k \cdot \phi
+\]
+où $\phi = \texttt{0x9E3779B97F4A7C15}$ est l'inverse du nombre d'or 64 bits (Knuth). Jusqu'à \texttt{max\_attempts} essais.
+
+\paragraph{Pourquoi ce choix ?} Trois raisons :
+\begin{itemize}
+    \item Backtracking propre = sauvegarder/restaurer l'état complet de la wave, potentiellement profond, avec impact mémoire imprédictible.
+    \item En pratique, sur les samples fournis, 1-2 attempts suffisent.
+    \item Pédagogiquement plus simple et lisible.
+\end{itemize}
+
+\subsection{Backtracking (option \texttt{--backtrack})}
+
+L'extension \texttt{--backtrack} (Chapitre~\ref{chap:extensions}) implémente l'alternative : sur contradiction, dépiler le dernier point de décision et essayer le candidat suivant. Le snapshot delta-encodé minimise la mémoire à $\sim 50$ cellules par frame plutôt que la wave complète.
+
+% =============================================================================
+\section{Reconstruction de la sortie}
+\label{sec:approche:output}
+% =============================================================================
+
+Une fois la wave complètement collapsée (chaque cellule à 1 candidat), on reconstruit la grille $G$ :
+
+\begin{definition}[Reconstruction]
+Pour chaque cellule $(r, c)$ de la wave, on lit l'unique tuile $t = W[r][c]$ encore active. La valeur de pixel $G[r][c]$ est la valeur du \textbf{coin haut-gauche} de $t$ :
+\[
+G[r][c] = T[t][0][0]
+\]
+\end{definition}
+
+Cette convention est nécessaire car dans le modèle overlapping, plusieurs tuiles couvrent chaque pixel. On choisit conventionnellement celui dont le coin haut-gauche est sur $(r, c)$. Vérifié par \texttt{test\_solver::output\_uses\_only\_input\_tiles}.
+
+% =============================================================================
+\section{Complexité et profilage}
+\label{sec:approche:complexite}
+% =============================================================================
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Étape} & \textbf{Complexité} & \textbf{Pour 128×128, $L = 11$} \\
+\midrule
+Extraction tuiles & $O(r_S \cdot c_S \cdot N^2)$ & $\sim 100$ µs (une fois) \\
+Règles d'adjacence & $O(L^2 \cdot (2N-1)^2 \cdot N^2)$ & $\sim 50$ µs (une fois) \\
+\textbf{Min-entropie} & $O(r \cdot c \cdot L)$ \textbf{par collapse} & $\sim 30$ µs \textbf{par collapse} \\
+Propagation BFS & $O(r \cdot c \cdot (2N-1)^2 \cdot L)$ amorti par collapse & $\sim 150$ µs par collapse \\
+Tirage RNG & $O(L)$ par collapse & $\sim 1$ µs par collapse \\
+\midrule
+\textbf{Total} (8000 collapses) & dominé par min-entropie + BFS & $\sim 3-4$ s en série \\
+\bottomrule
+\end{tabular}
+\caption{Décomposition de complexité du WFC séquentiel sur grille 128×128 binaire ($L = 11$).}
+\label{tab:wfc_complexity}
+\end{table}
+
+\begin{important}{Résultat contre-intuitif}
+La sélection min-entropie (re-scan de la wave entière à chaque collapse) domine $\sim 85\%$ du temps total. La propagation BFS, malgré sa complexité visible plus grande, ne représente que $\sim 12\%$.
+
+C'est ce qui justifie l'effort de parallélisation principal sur \texttt{parallel\_min\_entropy}, et non sur \texttt{propagate\_tasks} (Chapitre~\ref{chap:openmp}).
+\end{important}
+
+\section{Garanties d'invariants}
+
+Notre suite de tests vérifie systématiquement plusieurs invariants algorithmiques (Tableau~\ref{tab:invariants}).
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Invariant} & \textbf{Vérifié par} \\
+\midrule
+Sortie utilise uniquement des tuiles présentes dans l'échantillon & \texttt{test\_solver::output\_uses\_only\_input\_tiles} \\
+\midrule
+Symétrie des règles : $t_2 \in \text{allow}(t_1, d) \iff t_1 \in \text{allow}(t_2, -d)$ & \texttt{test\_overlap} \\
+\midrule
+Identité au décalage $(0, 0)$ : $\text{allow}(t, 0, 0) = \{t\}$ & \texttt{test\_overlap} \\
+\midrule
+Total des fréquences = $r_S \cdot c_S$ (toroïdal) & \texttt{test\_tileset} \\
+\midrule
+Déterminisme : même seed → même output (bit-à-bit) & \texttt{test\_solver}, \texttt{test\_solver\_omp}, \texttt{test\_solver\_kokkos} \\
+\midrule
+Bit-identité serial = OMP = Kokkos pour un même seed et $\{1, 2, 4, 8\}$ threads & \texttt{test\_solver\_omp}, \texttt{test\_solver\_kokkos} \\
+\midrule
+Reseed produit une sortie différente (haute probabilité) & \texttt{test\_solver\_omp}, \texttt{test\_solver\_kokkos} \\
+\bottomrule
+\end{tabularx}
+\caption{Invariants algorithmiques vérifiés par la suite de tests.}
+\label{tab:invariants}
+\end{table}

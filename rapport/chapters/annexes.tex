@@ -1,0 +1,228 @@
+\appendix
+
+\chapter{Annexes}
+\label{chap:annexes}
+
+\section{Commandes de build}
+\label{sec:annexes:build}
+
+\subsection{Linux / WSL2}
+
+\begin{lstlisting}[language=bash]
+sudo apt install build-essential cmake ninja-build
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_OMP=ON
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+\end{lstlisting}
+
+\subsection{Windows MSYS2 + MinGW UCRT}
+
+\begin{lstlisting}[language=bash]
+# MSYS2 shell
+pacman -Sy --needed mingw-w64-ucrt-x86_64-toolchain \
+    mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
+# PowerShell
+$env:Path = "C:\msys64\ucrt64\bin;$env:Path"
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_OMP=ON
+cmake --build build -j
+\end{lstlisting}
+
+\subsection{Romeo (HPC, x64cpu)}
+
+\begin{lstlisting}[language=bash]
+ssh romeo
+cd ~/wfc801
+romeo_load_x64cpu_env
+spack load /56vu72q   # cmake@3.31.8 %aocc
+spack load /tpamt4u   # ninja@1.12.1 %aocc
+spack load gcc@14.2.0
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_OMP=ON
+cmake --build build -j
+\end{lstlisting}
+
+\subsection{Romeo armgpu (Kokkos+CUDA)}
+
+\begin{lstlisting}[language=bash]
+salloc --partition=instant --constraint=armgpu --gpus-per-node=1 \
+    --time=01:00:00 --account=r250127
+romeo_load_armgpu_env
+# Kokkos avec backend CUDA
+cmake -S external/kokkos/src -B external/kokkos/build_cuda -G Ninja \
+    -DKokkos_ENABLE_CUDA=ON -DKokkos_ENABLE_SERIAL=ON \
+    -DKokkos_ARCH_HOPPER90=ON \
+    -DCMAKE_INSTALL_PREFIX="$PWD/external/kokkos/install_cuda"
+cmake --build external/kokkos/build_cuda -j && cmake --install
+# Project build
+cmake -B build_cuda -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    -DUSE_OMP=ON -DUSE_KOKKOS=ON -DUSE_LTO=ON \
+    -DKokkos_ROOT="$PWD/external/kokkos/install_cuda"
+cmake --build build_cuda -j
+\end{lstlisting}
+
+\subsection{Démo UE5}
+
+\begin{lstlisting}[language=bash]
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_OMP=ON \
+    -DBUILD_DUNGEON=ON
+cmake --build build -j
+./build/wfc_dungeon samples/multivalue_maze.txt --rows 24 --cols 24 \
+    -N 2 --seed 42 --levels 3 -o dungeon.json
+# Puis dans UE5 : drag ADungeonGenerator dans le niveau,
+# set JsonPath + TileMapping, click Generate From Json
+\end{lstlisting}
+
+% =============================================================================
+\section{Format CSV des benchmarks}
+\label{sec:annexes:csv}
+% =============================================================================
+
+Le \texttt{wfc\_benchmark} émet une ligne par configuration mesurée :
+
+\begin{verbatim}
+label,backend,threads,sample,N,rows,cols,seed,repeat,
+success,attempts,collapses,propagations,
+rules_s,solve_s,total_s
+\end{verbatim}
+
+Exemple de ligne :
+\begin{verbatim}
+binary_L11,omp,8,samples/binary_5x5.txt,2,128,128,42,0,
+1,1,16384,7892,0.0024,0.694,0.696
+\end{verbatim}
+
+\textbf{Colonnes clés :}
+\begin{itemize}
+    \item \texttt{label} : étiquette de workload (binary\_L11, terrain\_L33, ...)
+    \item \texttt{backend} : serial, omp, kokkos
+    \item \texttt{threads} : nombre de threads OMP (-1 pour Kokkos default concurrency)
+    \item \texttt{seed} : graine RNG
+    \item \texttt{success} : 1 si la grille est complète, 0 si échec
+    \item \texttt{solve\_s} : temps de résolution (référence pour les speedup)
+\end{itemize}
+
+% =============================================================================
+\section{Description des samples}
+\label{sec:annexes:samples}
+% =============================================================================
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{lXl}
+\toprule
+\textbf{Sample} & \textbf{Description} & \textbf{Usage} \\
+\midrule
+\texttt{binary\_5x5.txt} & 5×5 binaire, exemple littéral du sujet & Référence, tests \\
+\texttt{binary\_stripes.txt} & Bandes verticales 0/1 alternées & Cas dégénéré (2 tuiles) \\
+\texttt{binary\_dots.txt} & 1 isolés sur fond 0 & 7 tuiles, varié \\
+\texttt{binary\_checker.txt} & Damier 0/1 & 2 tuiles, dégénéré \\
+\texttt{multivalue\_terrain.txt} & 4 valeurs (eau/sable/herbe/roche), couches concentriques & 33 tuiles à $N=2$, 73 à $N=3$ \\
+\texttt{multivalue\_maze.txt} & 3 valeurs (sol/mur/porte), labyrinthe & 24 tuiles \\
+\texttt{multivalue\_smooth.txt} & 4 valeurs en gradients lisses & 12 tuiles, plateau scaling \\
+\texttt{skyline.txt} & 4 valeurs (sky/wall/window/foundation), 16×14 & Gallery, $N=3$ \\
+\texttt{plant.txt} & 4 valeurs (sky/stem/flower/ground), 16×15 & Gallery, $N=3$ \\
+\texttt{rooms.txt} & Binaire dungeon, pièces rectangulaires, 12×12 & Gallery, $N=3$ \\
+\bottomrule
+\end{tabularx}
+\caption{Description des samples livrés.}
+\label{tab:annexes:samples}
+\end{table}
+
+% =============================================================================
+\section{Liste des optimisations testées}
+\label{sec:annexes:optims}
+% =============================================================================
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{lXl}
+\toprule
+\textbf{Optim} & \textbf{Catégorie} & \textbf{Verdict} \\
+\midrule
+\texttt{-O3 -march=native} & compilateur & gardé (baseline) \\
+LTO (\texttt{USE\_LTO=ON}) & compilateur & gardé (+3.4\%) \\
+PGO (Profile-Guided Optim) & compilateur & rejeté (+0.4\% sup., complexité) \\
+Cache \texttt{f * log(f)} thread\_local & source-level CSAPP & rejeté (-6.7\%) \\
+\texttt{std::queue} → vector FIFO & source-level CSAPP & rejeté (-3\%) \\
+Hoist \texttt{wave.at(c)} (CSE manuel) & source-level CSAPP & rejeté (variance) \\
+Frontier-threshold (kSerialFallback) & OMP intra-attempt & gardé (+25\% à 64t) \\
+Relaxed-load avant \texttt{lock and} & OMP atomic & gardé (~50\% trafic) \\
+Single \texttt{parallel} region pour propagation & OMP arch & gardé (essentiel) \\
+Per-thread frontier alignas(64) & OMP anti-faux-partage & gardé \\
+NUMA first-touch parallèle & OMP NUMA & gardé \\
+\texttt{parallel\_min\_entropy} short-circuit & OMP small workloads & gardé \\
+Work-density gate dans \texttt{propagate\_tasks} & OMP workload-aware & rollbacked (risque binary) \\
+\texttt{cell\_jitter} SplitMix64 stateless & déterminisme & gardé \\
+Réduction min-entropie ordonnée & déterminisme & gardé \\
+Kokkos \texttt{kHostOnly} compile-time branch & Kokkos perf-portability & gardé \\
+Stack arrays \texttt{MAX\_WORDS\_PER\_CELL} & Kokkos GPU contraintes & gardé \\
+\texttt{push\_finalize\_hook} pour cleanup & Kokkos lifecycle & gardé \\
+Parallel attempts (\texttt{--parallel-attempts}) & extension algorithmique & gardé (option) \\
+Symétries D4 (\texttt{--symmetries}) & extension tile set & gardé (option) \\
+Backtracking + delta snapshot (\texttt{--backtrack}) & extension récupération & gardé (option) \\
+\bottomrule
+\end{tabularx}
+\caption{Liste exhaustive des optimisations testées.}
+\label{tab:annexes:optims}
+\end{table}
+
+% =============================================================================
+\section{Lancer les tests}
+\label{sec:annexes:tests}
+% =============================================================================
+
+\begin{lstlisting}[language=bash]
+# Tous les tests
+ctest --test-dir build --output-on-failure
+
+# Un test spécifique
+./build/test_solver_omp
+
+# Coverage (build_cov séparé)
+cmake -B build_cov -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+    -DUSE_OMP=ON -DUSE_KOKKOS=ON \
+    -DCMAKE_CXX_FLAGS="--coverage -O0 -g" \
+    -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+cmake --build build_cov -j
+ctest --test-dir build_cov
+python -m gcovr --root . --filter "include/wfc/" --filter "src/" \
+    --html-details docs/coverage/index.html build_cov
+
+# Race detection (TSAN)
+cmake -B build_tsan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+    -DUSE_OMP=ON -DUSE_TSAN=ON
+cmake --build build_tsan -j
+ctest --test-dir build_tsan --output-on-failure
+\end{lstlisting}
+
+% =============================================================================
+\section{Lancer les benchmarks}
+\label{sec:annexes:bench}
+% =============================================================================
+
+\subsection{En local}
+
+\begin{lstlisting}[language=bash]
+./scripts/run_benchmark.sh                    # build + sweep
+python3 scripts/plot_results.py results/benchmark.csv
+                                              # produit docs/figures/
+\end{lstlisting}
+
+\subsection{Sur Romeo}
+
+\begin{lstlisting}[language=bash]
+ssh romeo
+cd ~/wfc801
+sbatch scripts/romeo_full_bench.slurm         # 1h, full sweep CPU
+sbatch scripts/romeo_optim_test.slurm         # A/B optim
+sbatch scripts/build_kokkos_gpu_romeo.slurm   # 15 min, build GPU
+sbatch scripts/romeo_gpu_bench.slurm          # 10 min, bench GPU
+sbatch scripts/romeo_parallel_attempts.slurm  # A/B parallel-attempts
+
+# Récupérer les CSV
+scp romeo:~/wfc801/results/*.csv ./results/
+
+# Pipeline d'analyse
+bash scripts/post_job_pipeline.sh 543692
+# Génère docs/figures/scaling/, docs/figures/amdahl/,
+# results/tables_543692.md, results/insights_543692.md
+\end{lstlisting}

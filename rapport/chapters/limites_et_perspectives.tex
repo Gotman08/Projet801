@@ -1,0 +1,140 @@
+\chapter{Limites et perspectives}
+\label{chap:limites}
+
+\epigraph{\textit{``The best way to predict the future is to invent it.''}}{--- Alan Kay}
+
+Ce chapitre analyse les limites rencontrées lors du développement, les leçons apprises, et les pistes d'amélioration futures. L'évolution itérative du projet illustre que l'optimisation HPC est un processus d'exploration où certaines intuitions se révèlent fructueuses et d'autres contre-productives.
+
+% =============================================================================
+\section{Limites du solveur actuel}
+\label{sec:limites:current}
+% =============================================================================
+
+\subsection{Régression à très haut nombre de threads}
+
+Le speedup peak observé sur Romeo est 8.23× à 16 threads sur 256×256. Au-delà, régression brutale jusqu'à 0.19× la baseline à 192 threads (5× plus lent que serial).
+
+Trois causes contribuent (analysées en Chapitre~\ref{chap:resultats}) :
+\begin{itemize}
+    \item Frontières BFS courtes ($\sim 10$ cellules) sur 192 threads.
+    \item Fork/join répété ($\sim 50$ µs/niveau × 8000 niveaux).
+    \item Contention atomique inter-NUMA (3× plus chère qu'intra-NUMA).
+\end{itemize}
+
+L'optim « frontier-threshold » atténue les deux premières (+25\% à 64t, +29\% à 192t), mais la cause (3) reste non-adressée.
+
+\subsection{Plateau smooth\_N3}
+
+Sample \texttt{smooth\_N3} plafonne à 2.23× au peak (4 threads sur 128×128) et régresse dès 8 threads. Cause : peu de tuiles ($L = 12$) + $N = 3$ = peu de parallélisme par cellule (300 ops/cell), frontières BFS courtes (motifs lisses propagent peu).
+
+Pas de fix algorithmique côté intra-attempt sans risquer de régresser binary. Documenté comme fondamental.
+
+\subsection{GPU Kokkos plus lent que CPU sur ce workload}
+
+Le port Kokkos GPU (CUDA via GH200) est fonctionnel mais 8× plus lent que CPU OMP 8t à 128×128. Quatre causes :
+\begin{enumerate}
+    \item H↔D copies par propagate dominent ($\sim 16$ GB pour 256×256).
+    \item Pas assez de parallélisme par niveau BFS (16 896 cores CUDA, niveau de 100 cellules → 99\% oisifs).
+    \item Atomics globales du GPU bien plus lentes que CPU local.
+    \item Min-entropie reste sur CPU (la phase qui domine ne profite pas du GPU).
+\end{enumerate}
+
+% =============================================================================
+\section{Pistes d'amélioration}
+\label{sec:limites:perspectives}
+% =============================================================================
+
+\subsection{NUMA-aware partitioning}
+
+\textbf{Objectif} : adresser la cause (3) de la régression high-thread (contention atomique inter-NUMA).
+
+\textbf{Idée} : partitionner la wave par socket / NUMA node. Chaque thread n'écrit que sur la portion de wave de son NUMA node ; les frontières inter-partitions sont gérées par messages explicites (boîtes aux lettres, pas atomics).
+
+\textbf{Coût d'implémentation} : ~500 lignes, refactor majeur de \texttt{propagate\_tasks}, risque élevé de bugs de race.
+
+\textbf{Bénéfice attendu} : +30-50\% à 64-192 threads (élimination des cache-line ping-pongs cross-NUMA).
+
+\textbf{Statut} : non implémenté. Évalué comme « risque élevé pour bénéfice incertain » dans \texttt{docs/CHOICES.md}.
+
+\subsection{Batch GPU : K solveurs en parallèle dans un seul kernel}
+
+\textbf{Objectif} : adresser les causes (1) et (2) de la performance GPU décevante.
+
+\textbf{Idée} : au lieu de lancer un solveur sur GPU pour une grosse grille, lancer K solveurs indépendants sur K petites grilles, chacun assigné à un SM. Le GPU devient utile quand le data-parallelism massif est exploité.
+
+\textbf{Application} : génération en batch d'une scène avec plusieurs zones procédurales simultanément (un jeu open-world avec 32 régions à générer en parallèle).
+
+\textbf{Statut} : non implémenté. Documenté comme la voie principale pour vraiment exploiter le GPU sur ce workload.
+
+\subsection{Heuristique d'entropie incrémentale}
+
+\textbf{Objectif} : éliminer le re-scan complet de la wave à chaque collapse (qui domine $\sim 85\%$ du temps série).
+
+\textbf{Idée} : maintenir une priority queue des cellules par entropie, mise à jour incrémentale à chaque modification. Lazy invalidation : quand une cellule est touchée par propagate, on la marque \textit{stale} dans la PQ, on la re-priorise au prochain pop.
+
+\textbf{Bénéfice attendu} : la sélection passe de $O(r \cdot c \cdot L)$ par collapse à $O(\log(r \cdot c))$ amorti. Pour 256×256 ($\sim 65k$ cellules), facteur $\sim 1000$ sur le coût de la sélection.
+
+\textbf{Coût d'implémentation} : modéré. Une PQ thread-safe est délicate ; une variante plus simple est de maintenir un \textit{tournament tree} indexé par cell\_id.
+
+\textbf{Statut} : non implémenté. C'est probablement la piste avec le meilleur ratio bénéfice/risque.
+
+\subsection{SIMD pour les opérations bitset}
+
+\textbf{Objectif} : accélérer la version série pour les samples avec $L > 64$ (bitsets multi-mots).
+
+\textbf{Idée} : remplacer les boucles \texttt{for (i ; i < n ; ++i) words[i] op= other[i]} par des intrinsics AVX-512, traitant 8 mots de 64 bits par cycle.
+
+\textbf{Bénéfice attendu} : facteur 4-8 sur les AND/OR multi-mots. Effet limité car la version série est déjà O(words\_per\_cell) avec le compilateur en \texttt{-O3 -march=native} qui auto-vectorise dans certains cas.
+
+\textbf{Coût d'implémentation} : faible (juste un AVX-512 wrapper). Risque de portabilité (pas tous les CPU ont AVX-512, ARM Neoverse-V2 a SVE).
+
+\textbf{Statut} : non implémenté. Bénéfice incertain.
+
+\subsection{Symétries dans les règles d'adjacence}
+
+\textbf{Objectif} : extension naturelle de l'option \texttt{--symmetries} actuelle. Au lieu d'étendre seulement le tile set, exploiter les symétries dans la \textit{construction des règles} pour réduire la mémoire.
+
+\textbf{Idée} : si $t' = R_{90}(t)$, alors $\text{allowed}(t', dx, dy) = \text{rotate90}(\text{allowed}(t, dy, -dx))$. On peut stocker uniquement les règles pour les tuiles \textit{canoniques} (un représentant par classe d'équivalence) et déduire les autres à la demande.
+
+\textbf{Bénéfice} : mémoire des règles divisée par jusqu'à 8.
+
+\textbf{Statut} : non implémenté. Niche.
+
+% =============================================================================
+\section{Limites de l'évaluation}
+\label{sec:limites:evaluation}
+% =============================================================================
+
+\subsection{Une seule architecture HPC testée}
+
+Tous les benchmarks « HPC » sont sur Romeo (EPYC 9654). Nous n'avons pas testé sur :
+\begin{itemize}
+    \item Intel Xeon (architectures différentes, latences mémoire différentes).
+    \item AMD Genoa-X (V-Cache, pourrait changer le profil cache).
+    \item ARM Graviton (cloud AWS).
+\end{itemize}
+
+Les conclusions sur le scaling (peak à 16 threads sur 256×256, régression au-delà) sont spécifiques à EPYC 9654 et probablement transférables à d'autres EPYC, mais à valider.
+
+\subsection{Tailles limitées}
+
+Le sweep principal monte à 256×256. Une exécution à 512×512 a été tentée mais timeout (4h). Les conclusions sur le scaling ne peuvent pas être extrapolées au-delà sans mesure.
+
+\subsection{Variance non quantifiée}
+
+Nos mesures sont des médianes de 3 ou 11 runs. Nous ne reportons pas d'intervalle de confiance ou d'écart-type. Pour les A/B critiques (frontier-threshold), une analyse statistique formelle (test de Mann-Whitney) serait plus rigoureuse.
+
+% =============================================================================
+\section{Leçons HPC retenues}
+\label{sec:limites:lecons}
+% =============================================================================
+
+\begin{important}{Les 5 leçons principales}
+\begin{enumerate}
+    \item \textbf{Profiler avant d'optimiser}. Notre première intuition (« la propagation domine ») était fausse. La sélection min-entropie domine 8× la propagation.
+    \item \textbf{Une seule région \texttt{parallel}} pour la propagation. Le coût fork/join × N niveaux BFS est catastrophique sinon.
+    \item \textbf{A/B testing avec médiane}, pas moyenne. Sur 5 optims source-level CSAPP, une seule (LTO) a survécu. Le compilateur en \texttt{-O3 -march=native} fait déjà le travail.
+    \item \textbf{Le GPU n'est pas une solution magique}. Sur ce workload, GH200 est plus lent que CPU EPYC. Le data-parallelism massif requiert un re-design algorithmique (batch).
+    \item \textbf{Déterminisme et parallélisme} ne sont pas incompatibles, mais demandent une discipline : jitter stateless, réduction ordonnée, atomics commutatives. Vérification systématique par diff bit-à-bit.
+\end{enumerate}
+\end{important}

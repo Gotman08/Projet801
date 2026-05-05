@@ -1,0 +1,201 @@
+\chapter{Protocole expérimental et benchmarking}
+\label{chap:protocole}
+
+\epigraph{\textit{``In God we trust, all others must bring data.''}}{--- W. Edwards Deming}
+
+Ce chapitre décrit la méthodologie expérimentale : plates-formes de mesure, samples utilisés, métriques calculées, scripts SLURM, et reproductibilité.
+
+\section{Plates-formes}
+\label{sec:proto:plateformes}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{lXll}
+\toprule
+\textbf{ID} & \textbf{Hardware} & \textbf{OS} & \textbf{Compilateur} \\
+\midrule
+\texttt{lin-i9} & Intel i9-10900K (10c/20t HT) & Ubuntu 24.04 / WSL2 & g++ 13.3, OpenMP 4.5 \\
+\texttt{win-i9} & Intel i9-10900K & Windows 11 + MSYS2 MinGW & g++ 16.1, OpenMP 5.2 \\
+\texttt{romeo} & AMD EPYC 9654 (192c, 8 NUMA) & RHEL 9 & g++ 14.2, OpenMP 4.5 \\
+\texttt{romeo-gpu} & ARM Neoverse-V2 + NVIDIA GH200 & RHEL 9 & g++ 11.4 + nvcc 12.9 \\
+\bottomrule
+\end{tabularx}
+\caption{Plates-formes utilisées pour les benchmarks. Romeo est la cible HPC principale.}
+\label{tab:proto:plateformes}
+\end{table}
+
+\subsection{Romeo, plate-forme cible}
+
+Le supercalculateur \textbf{Romeo} de l'Université de Reims Champagne-Ardenne dispose de plusieurs partitions :
+\begin{itemize}
+    \item \texttt{x64cpu} : nœuds AMD EPYC 9654, 192 cœurs par nœud, 8 NUMA nodes (3 CCDs par node, 8 cœurs par CCD), 768 GB DRAM.
+    \item \texttt{armgpu} : 1 nœud ARM Grace + GPU NVIDIA GH200 120 GB HBM3, 132 SMs (16 896 cœurs CUDA).
+    \item \texttt{instant} (interactif) et \texttt{short} (jobs < 4h) : utilisés pour nos sweeps.
+\end{itemize}
+
+\subsection{Configuration NUMA et threading}
+
+Variables d'environnement utilisées sur Romeo :
+\begin{lstlisting}[language=bash]
+export OMP_PROC_BIND=close
+export OMP_PLACES=cores
+\end{lstlisting}
+
+\textbf{Justification :} \texttt{close} place les threads contigus dans la topologie (même CCD avant de passer au CCD suivant), ce qui maximise la localité L3. \texttt{cores} évite l'hyper-threading (1 thread par cœur physique).
+
+\section{Samples utilisés}
+\label{sec:proto:samples}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{llXX}
+\toprule
+\textbf{Sample} & \textbf{$N$} & \textbf{$L$} & \textbf{Caractéristiques} \\
+\midrule
+\texttt{binary\_5x5} & 2 & 11 & Exemple littéral du sujet, 5×5 binaire \\
+\texttt{binary\_stripes} & 2 & 4 & Bandes verticales, très contraint \\
+\texttt{binary\_dots} & 2 & 7 & 1 isolés sur fond 0 \\
+\texttt{binary\_checker} & 2 & 2 & Damier, dégénéré \\
+\texttt{multivalue\_terrain} & 2 & 33 & 4 valeurs (eau/sable/herbe/roche) \\
+\texttt{multivalue\_terrain} & 3 & 73 & Idem, $N$=3, contraintes serrées \\
+\texttt{multivalue\_maze} & 2 & 24 & 3 valeurs (sol/mur/porte) \\
+\texttt{multivalue\_smooth} & 3 & 12 & Gradients lisses, peu de tuiles \\
+\texttt{skyline} & 3 & 79 & Skyline urbain, 4 valeurs (gallery WFC) \\
+\texttt{plant} & 3 & 94 & Plante avec fleurs, 4 valeurs (gallery) \\
+\texttt{rooms} & 3 & 14 & Dungeon binaire, pièces rectangulaires \\
+\bottomrule
+\end{tabularx}
+\caption{Samples couverts par les benchmarks. Trois axes : alphabet (binaire vs multi-valeurs), $N$ (taille de tuile), nombre de tuiles uniques $L$.}
+\label{tab:proto:samples}
+\end{table}
+
+\subsection{Workloads agrégés}
+
+Pour les sweeps Romeo, nous regroupons en \textbf{labels} :
+
+\begin{itemize}
+    \item \texttt{binary\_L11} : \texttt{binary\_5x5.txt} avec $N=2$, $L=11$. Cas de référence du sujet.
+    \item \texttt{binary\_optim} : idem avec optim « frontier-threshold » activée. A/B vs \texttt{binary\_L11}.
+    \item \texttt{terrain\_L33} : \texttt{multivalue\_terrain.txt} avec $N=2$, $L=33$.
+    \item \texttt{smooth\_N3} : \texttt{multivalue\_smooth.txt} avec $N=3$, $L=12$.
+    \item \texttt{binary\_gpu}, \texttt{terrain\_gpu} : mêmes samples sur backend Kokkos CUDA (GH200).
+\end{itemize}
+
+\section{Métriques mesurées}
+\label{sec:proto:metriques}
+
+\subsection{Temps mesurés}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Métrique} & \textbf{Sémantique} \\
+\midrule
+\texttt{seconds\_total} & Wall-clock entre l'entrée et la sortie de \texttt{solve()} \\
+\texttt{seconds\_solve} & Somme des temps des \texttt{run\_attempt} (vrai temps WFC) \\
+\texttt{collapses} & Nombre de cellules décidées \\
+\texttt{propagations} & Nombre d'événements de propagation \\
+\texttt{attempts} & Nombre d'attempts essayés (1 si succès au premier coup) \\
+\bottomrule
+\end{tabularx}
+\caption{Métriques de \texttt{SolverStats}. \texttt{seconds\_solve} est utilisée comme référence pour les speedup.}
+\label{tab:proto:stats}
+\end{table}
+
+\subsection{Métriques dérivées}
+
+\begin{itemize}
+    \item \textbf{Speedup} : $S(p) = T_{\text{serial}} / T(p)$.
+    \item \textbf{Efficacité parallèle} : $E(p) = S(p) / p$.
+    \item \textbf{Throughput} : cellules / seconde.
+    \item \textbf{Fit Amdahl} : régression non-linéaire de $S(p) = 1 / ((1-f) + f/p)$ ; donne $f$ et $R^2$.
+\end{itemize}
+
+\subsection{Réduction du bruit de mesure}
+
+Chaque configuration est mesurée \textbf{3 fois} (paramètre \texttt{--repeats 3}). On reporte la \textbf{médiane}, plus robuste que la moyenne face aux outliers.
+
+Pour les A/B testing fins, on utilise une \textbf{médiane sur 11 runs alternés} : exécution alternée A B A B A B A B A B A, médiane des 6 mesures de chaque variante.
+
+\section{Scripts SLURM Romeo}
+\label{sec:proto:slurm}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Script} & \textbf{Rôle} \\
+\midrule
+\texttt{romeo\_smoke.slurm} & Smoke test 15 min, 32 cores \\
+\texttt{romeo\_full\_bench.slurm} & Full sweep CPU 1h, sizes 32-256, threads 1-192 \\
+\texttt{romeo\_complement\_bench.slurm} & Complément terrain et smooth, 10 min \\
+\texttt{romeo\_optim\_test.slurm} & A/B « frontier-threshold » \\
+\texttt{build\_kokkos\_gpu\_romeo.slurm} & Build Kokkos+CUDA + tests sur \texttt{armgpu} \\
+\texttt{romeo\_gpu\_bench.slurm} & Bench GPU GH200, 10 min \\
+\texttt{romeo\_parallel\_attempts.slurm} & A/B \texttt{--parallel-attempts} sur terrain N=3 \\
+\bottomrule
+\end{tabularx}
+\caption{Scripts SLURM Romeo livrés avec le projet.}
+\label{tab:proto:slurm}
+\end{table}
+
+\section{Format CSV des résultats}
+\label{sec:proto:csv}
+
+Le \texttt{wfc\_benchmark} émet un CSV avec les colonnes :
+\begin{verbatim}
+label, backend, threads, sample, N, rows, cols, seed, repeat,
+success, attempts, collapses, propagations, rules_s, solve_s, total_s
+\end{verbatim}
+
+Une ligne par (label, backend, threads, size, seed, repeat). Plusieurs labels peuvent coexister dans un même CSV via \texttt{--no-header} sur les sweeps successifs.
+
+\section{Pipeline d'analyse Python}
+\label{sec:proto:pipeline}
+
+Une fois le CSV récupéré (\texttt{scp romeo:results/full\_543692.csv ./results/}), un pipeline Python génère figures et tableaux :
+
+\begin{lstlisting}[language=bash]
+bash scripts/post_job_pipeline.sh 543692
+\end{lstlisting}
+
+\textbf{Scripts Python} :
+\begin{itemize}
+    \item \texttt{plot\_results.py} : speedup, efficacité, heatmap, throughput, comparaison backends
+    \item \texttt{amdahl\_fit.py} : fit non-linéaire, sortie JSON + figures
+    \item \texttt{benchmark\_summary.py} : tableaux markdown auto-générés
+    \item \texttt{benchmark\_insights.py} : détection automatique des knees, peak, régressions
+    \item \texttt{plot\_optim\_compare.py} : barres avant/après pour les A/B
+\end{itemize}
+
+\section{Reproductibilité}
+\label{sec:proto:reproductibilite}
+
+\begin{itemize}
+    \item Scripts SLURM, scripts Python, samples : tous versionnés dans le dépôt git.
+    \item Seeds RNG fixés (\texttt{--seed 42}) : exécution déterministe.
+    \item CSV bruts commités : on peut re-générer les figures sans relancer Romeo.
+    \item Figures finales dans \texttt{docs/figures/} : le rapport compile sans relancer le pipeline.
+\end{itemize}
+
+\section{Couverture des configurations}
+\label{sec:proto:coverage}
+
+Les 220+ runs benchmarkés sur Romeo couvrent :
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{lXX}
+\toprule
+\textbf{Job ID} & \textbf{Workload} & \textbf{Configuration} \\
+\midrule
+\texttt{543692} & binary\_L11 sweep 1 & sizes 32-256 ; threads 1-192 \\
+\texttt{544061} & terrain\_L33, smooth\_N3 & sizes 32-128 ; threads 1-32 \\
+\texttt{544356} & binary\_optim A/B & size 128 ; threads 1-192 \\
+\texttt{544361} & binary\_gpu, terrain\_gpu & sizes 32-256 ; threads 1, 4, 16 + GPU \\
+\bottomrule
+\end{tabularx}
+\caption{Jobs SLURM utilisés pour le rapport. CSV combiné dans \texttt{results/all\_combined.csv} (398 lignes).}
+\label{tab:proto:jobs}
+\end{table}
