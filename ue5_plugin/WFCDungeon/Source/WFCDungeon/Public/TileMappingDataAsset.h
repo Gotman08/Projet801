@@ -57,6 +57,30 @@ struct WFCDUNGEON_API FTileVariants
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tile")
 	TObjectPtr<UStaticMesh> DoorMesh = nullptr;
 
+	/**
+	 * Optional mesh variants. When non-empty, one entry is picked at
+	 * random per spawn (uniform distribution) instead of using the
+	 * single-mesh fields above. This breaks the visual repetition that
+	 * appears on big dungeons (every wall identical, every floor tile
+	 * identical, ...). The single-mesh field is used as a fallback when
+	 * the corresponding array is empty, so existing DataAssets keep
+	 * working untouched.
+	 *
+	 * Tip: include the original mesh in the array (or leave the array
+	 * empty) if you want it to remain in the rotation.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tile|Variants")
+	TArray<TObjectPtr<UStaticMesh>> FloorMeshVariants;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tile|Variants")
+	TArray<TObjectPtr<UStaticMesh>> WallMeshVariants;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tile|Variants")
+	TArray<TObjectPtr<UStaticMesh>> CornerMeshVariants;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tile|Variants")
+	TArray<TObjectPtr<UStaticMesh>> DoorMeshVariants;
+
 	/** Optional yaw correction applied to every spawned mesh of this
 	 *  variant. Use it to fix exporter conventions (Blender Z-up vs
 	 *  UE Z-up, +Y forward vs +X forward, ...). */

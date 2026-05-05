@@ -32,6 +32,16 @@ public class WFCDungeon : ModuleRules
 		{
 			"Json",
 			"JsonUtilities",
+			"NavigationSystem",
 		});
+
+		// UnrealEd is needed at edit time to rebuild the brush of an
+		// ANavMeshBoundsVolume via UCubeBuilder, which is the only
+		// reliable way to physically resize a brush volume. Strictly
+		// editor-only, the runtime module fall-back is actor scaling.
+		if (Target.bBuildEditor)
+		{
+			PrivateDependencyModuleNames.Add("UnrealEd");
+		}
 	}
 }
