@@ -21,11 +21,21 @@ struct SolverOptions {
     std::uint64_t seed = 0;
     int max_attempts = kDefaultMaxAttempts;
 
+    // Number of attempts run concurrently. 1 = legacy sequential retry. K > 1
+    // launches K serial attempts in parallel; the lowest-indexed success wins,
+    // so output remains deterministic for a given seed (a serial run with the
+    // same max_attempts would have picked the same attempt). Pays off when
+    // single attempts have a low success rate (e.g. tightly constrained
+    // samples like terrain N=3); wasteful when single attempts almost always
+    // succeed.
+    int parallel_attempts = 1;
+
     // Throws std::invalid_argument if any field is out of range.
     void validate() const {
-        if (rows < 1)         throw std::invalid_argument("SolverOptions: rows < 1");
-        if (cols < 1)         throw std::invalid_argument("SolverOptions: cols < 1");
-        if (max_attempts < 1) throw std::invalid_argument("SolverOptions: max_attempts < 1");
+        if (rows < 1)              throw std::invalid_argument("SolverOptions: rows < 1");
+        if (cols < 1)              throw std::invalid_argument("SolverOptions: cols < 1");
+        if (max_attempts < 1)      throw std::invalid_argument("SolverOptions: max_attempts < 1");
+        if (parallel_attempts < 1) throw std::invalid_argument("SolverOptions: parallel_attempts < 1");
     }
 };
 

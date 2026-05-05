@@ -240,9 +240,54 @@ Plus le thread count est haut, plus le gain est grand. À 1-2 threads,
 l'optim est légèrement négative (-3% à -5%), dans le bruit. La
 régression brutale n'est pas éliminée mais atténuée de ~25-30%.
 
-La cause (3), contention atomique inter-NUMA, reste non-adressée. Pour
-aller plus loin il faudrait un partitionnement NUMA-aware de la wave
-ou un changement algorithmique (parallel attempts).
+La cause (3), contention atomique inter-NUMA, reste non-adressée par
+cette optim. La piste suivante (parallel attempts) la contourne : au
+lieu d'une seule wave partagée par 8+ threads, K attempts indépendants
+roulent chacun sur son propre wave thread-local.
+
+### Optim "parallel attempts" (gardée)
+
+Au lieu de paralléliser à l'intérieur d'un attempt, on lance K attempts
+*indépendants* en parallèle, chacun sur son propre `Wave`, et on garde
+le succès d'index le plus bas (déterminisme préservé : sortie identique
+à un retry séquentiel). Activé via `SolverOptions::parallel_attempts`
+ou `--parallel-attempts K` côté CLI.
+
+Quand ça paie : workload où le taux d'échec par attempt est non
+négligeable (terrain N=3, multivalue serré). Chaque attempt étant
+sérialisé, les coûts de barrière BFS, de contention atomique
+inter-NUMA, et de fork/join répété disparaissent — on ne paie qu'une
+synchronisation finale pour collecter le résultat.
+
+Quand ça ne paie pas : workload qui réussit en 1 attempt (binary_5x5,
+smooth_N3). K attempts en parallèle font K× le travail, gain wallclock
+nul.
+
+Mesure locale (Windows i9-10900K, terrain N=3 24×24, 4 seeds, total) :
+
+| Mode | Total wallclock | Speedup |
+|---|---|---|
+| `--parallel-attempts 1 --threads 1` | 0.510 s | 1.0× (baseline) |
+| `--parallel-attempts 4 --threads 4` | 0.332 s | 1.54× |
+| `--parallel-attempts 8 --threads 8` | 0.238 s | 2.14× |
+
+Vérification déterminisme : la sortie est bit-identique à `--threads 1`
+pour les mêmes seeds (même `winning_attempt` reporté). Test
+`test_parallel_attempts` couvre ce cas.
+
+### Optim "min-entropy work-density gate" (gardée)
+
+`parallel_min_entropy` court-circuite vers `serial_min_entropy` quand
+`total_cells × num_tiles < 50 000` ou `max_threads ≤ 1`. La granularité
+des chunks passe de `total/(4×threads)` à `total/threads` (1 chunk par
+thread au lieu de 4) : moins de tâches OMP, moins d'overhead pour un
+load balancing qui n'apporte rien (chunks de coût identique).
+
+`propagate_tasks` ajoute un second seuil au-delà du frontier-size :
+`frontier_size × num_tiles × (2N-1)² ≥ 50 000`. C'est le seuil qui
+fait basculer smooth_N3 (peu de tuiles, peu de parallélisme par
+cellule) en série au-delà de 4 threads, là où la barrière BFS dépassait
+le travail utile.
 
 ## GPU sur Romeo (NVIDIA GH200)
 

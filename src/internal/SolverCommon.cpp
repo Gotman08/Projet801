@@ -1,7 +1,10 @@
 #include "wfc/internal/SolverCommon.hpp"
 
+#include "wfc/WFCSolver.hpp"
+
 #include <cmath>
 #include <cstddef>
+#include <queue>
 
 namespace wfc {
 
@@ -54,6 +57,76 @@ MinEntropyResult serial_min_entropy(const Wave& wave,
         }
     }
     return best;
+}
+
+namespace {
+
+void union_allowed(Bitset& out,
+                   ConstBitsetView cell_wave,
+                   const OverlapRules& rules,
+                   int dx, int dy) {
+    out.reset();
+    cell_wave.for_each_set([&](std::size_t t) {
+        out.or_with(rules.allowed(static_cast<int>(t), dx, dy));
+    });
+}
+
+} // namespace
+
+bool serial_propagate(Wave& wave,
+                      const OverlapRules& rules,
+                      int start_cell,
+                      int& propagations) {
+    const int N = rules.N();
+    const int num_tiles = rules.num_tiles();
+    std::queue<int> q;
+    q.push(start_cell);
+
+    Bitset allowed(num_tiles);
+    while (!q.empty()) {
+        const int c = q.front(); q.pop();
+        const int r = wave.row(c);
+        const int col = wave.col(c);
+
+        for (int dy = -(N - 1); dy <= N - 1; ++dy) {
+            for (int dx = -(N - 1); dx <= N - 1; ++dx) {
+                if (dx == 0 && dy == 0) continue;
+                const int nc = wave.torus_idx(r + dy, col + dx);
+
+                union_allowed(allowed, wave.at(c), rules, dx, dy);
+
+                BitsetView dst = wave.at(nc);
+                if (dst.and_with(allowed)) {
+                    ++propagations;
+                    if (!dst.any()) return false;
+                    q.push(nc);
+                }
+            }
+        }
+    }
+    return true;
+}
+
+bool serial_run_attempt(Wave& wave,
+                        const TileSet& tiles,
+                        const OverlapRules& rules,
+                        std::uint64_t seed,
+                        std::mt19937_64& rng,
+                        SolverStats& stats) {
+    while (true) {
+        const int cell = serial_min_entropy(wave, tiles.frequencies(), seed).cell;
+        if (cell < 0) {
+            for (int c = 0; c < wave.num_cells(); ++c) {
+                if (wave.at(c).count() == 0) return false;
+            }
+            return true;
+        }
+        const int t = weighted_pick(wave.at(cell), tiles.frequencies(), rng);
+        wave.at(cell).set_only(static_cast<std::size_t>(t));
+        ++stats.collapses;
+        if (!serial_propagate(wave, rules, cell, stats.propagations))
+            return false;
+    }
 }
 
 Grid build_output(const Wave& wave, const TileSet& tiles) {

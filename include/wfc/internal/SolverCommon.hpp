@@ -69,6 +69,26 @@ MinEntropyResult serial_min_entropy(const Wave& wave,
                                     const std::vector<std::uint32_t>& freq,
                                     std::uint64_t seed);
 
+// Single-thread BFS propagation. Pulled out of WFCSolverSerial so the
+// parallel-attempts orchestration can reuse it without recursing into a
+// backend's own (potentially nested) parallel propagate.
+bool serial_propagate(Wave& wave,
+                      const OverlapRules& rules,
+                      int start_cell,
+                      int& propagations);
+
+struct SolverStats; // forward decl from WFCSolver.hpp
+
+// One full WFC attempt, end to end, single-threaded. Used by the
+// parallel-attempts batch orchestrator: K of these run concurrently on
+// independent waves; the lowest-indexed success wins.
+bool serial_run_attempt(Wave& wave,
+                        const TileSet& tiles,
+                        const OverlapRules& rules,
+                        std::uint64_t seed,
+                        std::mt19937_64& rng,
+                        SolverStats& stats);
+
 // Reconstruct the output grid from a fully collapsed wave: pixel (r, c)
 // receives the top-left value of the tile selected at (r, c).
 Grid build_output(const Wave& wave, const TileSet& tiles);

@@ -20,6 +20,7 @@ struct Args {
     int N = 2;
     std::uint64_t seed = 0;
     int attempts = 5;
+    int parallel_attempts = 1;
     int threads = 0;
     int scale = 8;
     std::string out_txt;
@@ -36,6 +37,7 @@ inline void print_usage(const char* prog) {
         "  -N N               tile size (default 2)\n"
         "  --seed S           rng seed (default 0)\n"
         "  --attempts A       max attempts on contradiction (default 5)\n"
+        "  --parallel-attempts K  run K attempts concurrently (default 1)\n"
         "  --threads T        parallel threads (default: backend default)\n"
         "  --scale S          render scale for ppm/png (default 8)\n"
         "  --out FILE.txt     write text output\n"
@@ -68,6 +70,7 @@ inline Args parse(int argc, char** argv) {
         else if (k == "-N")         a.N        = std::stoi(next("-N"));
         else if (k == "--seed")     a.seed     = std::stoull(next("--seed"));
         else if (k == "--attempts") a.attempts = std::stoi(next("--attempts"));
+        else if (k == "--parallel-attempts") a.parallel_attempts = std::stoi(next("--parallel-attempts"));
         else if (k == "--threads")  a.threads  = std::stoi(next("--threads"));
         else if (k == "--scale")    a.scale    = std::stoi(next("--scale"));
         else if (k == "--out")      a.out_txt  = next("--out");
@@ -93,6 +96,7 @@ inline void run(WFCSolver& solver, const Args& a) {
     opt.cols = a.cols;
     opt.seed = a.seed;
     opt.max_attempts = a.attempts;
+    opt.parallel_attempts = a.parallel_attempts;
 
     SolverStats stats;
     Grid out = solver.solve(tiles, rules, opt, stats);

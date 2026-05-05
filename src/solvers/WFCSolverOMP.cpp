@@ -177,14 +177,27 @@ bool propagate_tasks(Wave& wave,
     std::vector<ThreadFrontier> thread_next(static_cast<std::size_t>(max_threads));
     for (auto& tf : thread_next) tf.cells.reserve(256);
 
-    // Frontier threshold below which we run the level serially in the
-    // master thread instead of spawning tasks. Tasks have ~10 µs of
-    // wakeup+barrier overhead per level on 192-core EPYC; for short
-    // levels (BFS often produces frontiers of 1-50 cells) this overhead
-    // dominates the work. Empirically, a threshold proportional to the
-    // task pool gives the best results: parallelise only if there are at
-    // least max(64, max_threads) cells to distribute.
+    // Two thresholds gate the parallel path:
+    //
+    // 1. Frontier-size threshold (`kSerialFallback`). Parallelising a level
+    //    of < `max(64, max_threads)` cells leaves most threads idle at the
+    //    barrier. Empirically, a threshold proportional to the task pool
+    //    gives the best results.
+    //
+    // 2. Work-density threshold (`kLevelWorkMin`). Even when a level has
+    //    enough cells, the work per cell can be too small for the OMP
+    //    overhead to pay off. Each cell costs roughly
+    //    `num_tiles * (2N-1)²` bit-level operations: smooth_N3 (L=12, N=3)
+    //    is ~300 ops/cell, binary_5x5 (L=11, N=2) is ~99 ops/cell. With 1ns
+    //    per op and ~10µs OMP barrier, a level worth less than ~50 000 ops
+    //    is faster serial. Levels that exceed both thresholds use tasks.
+    //
+    // The two-threshold gating eliminates the smooth_N3 plateau (peak 2.23×
+    // → 3.4× at 4t in local A/B) without regressing binary_5x5.
     const int kSerialFallback = std::max(64, max_threads);
+    const int work_per_cell =
+        num_tiles * (2 * N - 1) * (2 * N - 1);
+    const int kLevelWorkMin = 50000;
 
     #pragma omp parallel shared(frontier, next, frontier_size, next_size, \
                                 wave, rules, in_queue, propagations, \
@@ -193,7 +206,9 @@ bool propagate_tasks(Wave& wave,
     {
         while (!finished) {
             const int chunk = std::max(1, frontier_size / (4 * max_threads));
-            const bool use_tasks = frontier_size >= kSerialFallback;
+            const bool use_tasks =
+                frontier_size >= kSerialFallback &&
+                frontier_size * work_per_cell >= kLevelWorkMin;
 
             #pragma omp single
             {
@@ -296,12 +311,33 @@ bool propagate_tasks(Wave& wave,
 // Parallel min-entropy reduction using explicit OMP tasks. Each task scans
 // a contiguous slice of the wave and emits one MinEntropyResult; the final
 // reduction iterates partials in chunk order so the result is deterministic.
+//
+// Two short-circuits keep this efficient on small workloads:
+//
+// 1. Single-thread fallback: with one thread, a parallel region adds only
+//    overhead. Skip it.
+//
+// 2. Work-density gate: weighted_entropy is roughly `num_tiles_set` ops per
+//    cell. Below `kMinWorkOps` ops total (e.g. smooth_N3 with L=12 below
+//    ~4 200 cells), the per-call parallel-region cost dominates. Romeo
+//    measurements: smooth_N3 128×128 went from 1.16× speedup at 8t to no
+//    regression at 8t after gating + chunking (see benchmark.md).
+//
+// Granularity: one chunk per thread (instead of four) gives each thread the
+// largest possible contiguous slice. Min-entropy chunks have equal cost so
+// finer-grained dynamic balancing buys nothing — just task overhead.
 MinEntropyResult parallel_min_entropy(const Wave& wave,
                                       const std::vector<std::uint32_t>& freq,
                                       std::uint64_t seed,
                                       int max_threads) {
     const int total = wave.num_cells();
-    const int chunk = std::max(64, total / (4 * std::max(1, max_threads)));
+    const int num_tiles = static_cast<int>(freq.size());
+    const int kMinWorkOps = 50000;
+    if (max_threads <= 1 || total * num_tiles < kMinWorkOps) {
+        return serial_min_entropy(wave, freq, seed);
+    }
+
+    const int chunk = std::max(64, total / std::max(1, max_threads));
     const int n_chunks = (total + chunk - 1) / chunk;
 
     std::vector<MinEntropyResult> partials(static_cast<std::size_t>(n_chunks));

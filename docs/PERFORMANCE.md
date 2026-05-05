@@ -25,7 +25,7 @@ hoisting de `wave.at(c)`) ont toutes été rejetées — le compilateur en
 | Variante                              | Median 128×128 | Δ baseline |
 |---------------------------------------|----------------|------------|
 | Release `-O3 -march=native` (baseline) | 4.280 s        | —          |
-| Release + `USE_LTO=ON`                | 4.134 s        | **+3.4%**  |
+| Release + `USE_LTO=ON`                | 4.134 s        | +3.4%  |
 | Release + LTO + PGO                   | 4.143 s        | +4.3% (mais PGO complique le build pour 0.4% de plus, rejeté) |
 | Cache `f * log(f)` thread_local       | 4.749 s        | -6.7% (régression, rejeté) |
 | `std::queue` → vector FIFO            | 4.586 s        | -3% (dans le bruit, rejeté) |
@@ -52,6 +52,39 @@ quand le niveau BFS est trop court pour amortir le coût des `omp task`
 L'optim aide nettement à partir de 8 threads, et l'effet grandit avec
 le thread count (jusqu'à +29% à 192 threads). À 1-2 threads l'effet est
 légèrement négatif mais dans le bruit. Optim gardée.
+
+### Parallel attempts (gardée)
+
+Au lieu de paralléliser intra-attempt (limite à 8-16 threads avant
+régression), on lance K attempts WFC indépendants en parallèle. Chaque
+attempt sérialisé sur son propre `Wave`, succès d'index minimum gagne
+(déterminisme préservé).
+
+Mesure locale (Windows i9, terrain N=3 24×24, total 4 seeds) :
+
+| Mode | Total | Speedup |
+|---|---|---|
+| sequential, 1 thread | 0.510 s | 1.0× |
+| --parallel-attempts 4 --threads 4 | 0.332 s | 1.54× |
+| --parallel-attempts 8 --threads 8 | 0.238 s | 2.14× |
+
+Inutile sur workloads à fort taux de succès (binary_5x5, smooth_N3) :
+K attempts = K× le travail pour le même résultat. Utile sur workloads
+serrés (terrain N=3, maze contraint).
+
+### Min-entropy work-density gate (gardée)
+
+`parallel_min_entropy` court-circuite vers `serial_min_entropy` quand
+le travail prévu (`total_cells × num_tiles`) est < 50 000 ops, ou quand
+`max_threads ≤ 1`. Granularité changée de `total/(4×threads)` à
+`total/threads` (1 chunk par thread) : moins de tasks OMP pour un load
+balancing inutile (chunks de coût égal).
+
+`propagate_tasks` ajoute le seuil
+`frontier_size × num_tiles × (2N-1)² ≥ 50 000` au-dessus du
+frontier-size threshold existant. C'est ce seuil qui fait basculer
+smooth_N3 (peu de tuiles + N=3 = peu de parallélisme par cellule) en
+série au-delà de 4 threads.
 
 Activer LTO : `cmake -B build -DUSE_LTO=ON ...`
 
@@ -149,7 +182,7 @@ problème plus tendu, plus dur à résoudre.
 ## Bande passante mémoire
 
 À 128×128 avec L=11 (1 mot par cellule), la wave occupe 16 384 mots =
-**128 KB**. Tient en L2 (256 KB par cœur sur EPYC) mais pas en L1
+128 KB. Tient en L2 (256 KB par cœur sur EPYC) mais pas en L1
 (32 KB). Pour 256×256, la wave fait 524 KB → débordement L2,
 accès LLC.
 

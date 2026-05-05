@@ -171,7 +171,21 @@ frontière BFS, `Kokkos::atomic_fetch_and` / `atomic_compare_exchange` pour les
 écritures concurrentes. Le code utilise `Kokkos::ScopeGuard` pour gérer le
 cycle de vie. Le backend Kokkos cible OpenMP par défaut (`-DKokkos_ENABLE_OPENMP=ON`).
 
-## 3.4. Déterminisme
+## 3.4. Parallel attempts
+
+Optim algorithmique : au lieu de paralléliser à l'intérieur d'un seul
+attempt (qui sature à 8-16 threads quand le travail par BFS-level
+devient trop petit), on lance K attempts WFC indépendants en parallèle.
+Chaque attempt a son propre `Wave`, son propre seed dérivé
+(`base + k × φ`), et tourne en série. On garde le succès d'index
+minimum (déterminisme : sortie identique à un retry séquentiel).
+
+Bénéfice mesuré sur terrain N=3 24×24 : 2.14× wallclock à K=8 vs
+sequential. Inutile sur les workloads qui ne ratent jamais (binary_5x5)
+mais c'est précisément là que la parallélisation intra-attempt
+fonctionne déjà bien.
+
+## 3.5. Déterminisme
 
 Conserver la propriété « même seed → même output » à travers les backends a
 nécessité deux décisions :
@@ -190,66 +204,95 @@ testée par `test_solver` et systématiquement vérifiée pendant le développem
 
 # 4. Analyse de performance
 
-## 4.1. Plate-forme
+## 4.1. Plates-formes
 
-- **CPU** : AMD/Intel × 20 threads matériels (10 cœurs HT)
-- **OS** : Ubuntu 24.04 sous WSL2 (Windows 11 hôte)
-- **Compilateur** : g++ 13.3.0, `-O3 -march=native -fopenmp`
-- **OpenMP** : 4.5 (libgomp)
+| ID | Hardware | OS | Compilateur | OpenMP |
+|---|---|---|---|---|
+| `lin-i9` | Intel i9-10900K (10c / 20t HT) | Ubuntu 24.04 WSL2 | g++ 13.3 | 4.5 |
+| `win-i9` | i9-10900K | Windows 11 + MSYS2 MinGW | g++ 16.1 | 5.2 |
+| `romeo` | AMD EPYC 9654 (192c, 8 NUMA) | RHEL 9 | g++ 14.2 | 4.5 |
 
-## 4.2. Speedup et efficacité
+Les chiffres rapportés ci-dessous proviennent de Romeo — la plateforme
+HPC cible pour ce TP. `docs/benchmark.md` contient l'analyse complète
+(jobs SLURM 543692, 544061, 544356, 544361, ~600 mesures).
 
-![Speedup](figures/speedup.png){ width=80% }
+## 4.2. Speedup et efficacité — Romeo (binary_5x5, N=2)
 
-Sur la grille `128 × 128` (notre point de fonctionnement le plus représentatif) :
+| Taille | 1t | 4t | 8t | 16t | 32t | 64t | 192t |
+|---|---|---|---|---|---|---|---|
+| 32×32 | 1.00× | 1.16× | 0.91× | 0.33× | 0.18× | 0.09× | 0.02× |
+| 64×64 | 1.00× | 2.54× | 2.64× | 0.65× | 0.38× | 0.16× | 0.06× |
+| 128×128 | 1.00× | 3.39× | 5.27× | 2.60× | 0.87× | 0.30× | 0.11× |
+| 256×256 | 1.00× | 3.65× | 6.73× | 8.23× | 3.91× | 1.26× | 0.19× |
 
-| Threads | Solve médian (s) | Speedup | Efficacité |
-|---------|------------------|---------|------------|
-| 1 (série) | 3.30           | 1.00 ×  | 100 %      |
-| omp 1   | 3.28             | 1.00 ×  | 100 %      |
-| omp 2   | 1.83             | 1.79 ×  | 90 %       |
-| omp 4   | 1.14             | 2.88 ×  | 72 %       |
-| omp 8   | 0.98             | 3.34 ×  | 42 %       |
+Lecture :
 
-Pour les petites grilles (`32 × 32`), le coût de fork/join et de création de
-tâches dépasse le travail utile : le serial reste ~1.5–2× plus rapide. Pour les
-grandes grilles, la scalabilité est très bonne jusqu'à 4 threads (efficacité
-> 70 %), puis l'efficacité décroît à cause de :
+- Le peak monte avec la taille : 32×32 ne paie pas la parallélisation ;
+  256×256 atteint 8.23× à 16 threads (51% d'efficacité).
+- Au-delà du peak, régression brutale : à 192 threads sur 256×256 on
+  est à 0.19× la baseline (5× plus lent que le serial). Les barrières
+  BFS sur niveaux courts et la contention atomique inter-NUMA dominent.
+- L'optim « frontier threshold »
+  ([WFCSolverOMP.cpp](../src/solvers/WFCSolverOMP.cpp)) atténue la
+  régression de +25% à +29% à 64-192 threads.
 
-- la **cellule chaude** sur la wave (les threads écrivent souvent sur les
-  mêmes mots `uint64_t` proches du dernier collapse) ;
-- la **synchronisation barrière** à chaque niveau BFS (les niveaux sont
-  généralement courts, et tous les threads doivent se rejoindre) ;
-- la **bande passante mémoire** : la wave occupe `rows·cols·⌈L/64⌉·8` octets =
-  ~130 KB pour 128 × 128, qui ne tient plus en L1 mais reste en L2.
+![Amdahl 256×256](figures/amdahl/amdahl_binary_L11_256.png){ width=70% }
 
-![Efficacité](figures/efficiency.png){ width=80% }
+Le fit Amdahl donne `f = 0.944` sur 256×256 — code parallélisable à
+~94%, ceiling théorique 17.8×. Le peak observé à 51% du ceiling reflète
+les coûts non capturés par Amdahl (NUMA, contention, fork/join).
 
 ## 4.3. Variations du dataset
 
-Nous avons benchmarké quatre échantillons :
+Quatre échantillons benchmarkés (Romeo) :
 
-| Échantillon         | L  | Comportement                            |
-|---------------------|----|------------------------------------------|
-| `binary_5x5`        | 11 | Cas de référence du sujet ; convergence rapide |
-| `binary_stripes`    | 4  | Très contraint, peu de tuiles             |
-| `binary_dots`       | 7  | Quelques 1 isolés ; reproduit fidèlement  |
-| `multivalue_terrain`| 33 | 4 valeurs (eau/sable/herbe/roche)         |
+| Échantillon | N | L | Cas type |
+|---|---|---|---|
+| `binary_5x5` | 2 | 11 | Cas de référence du sujet |
+| `multivalue_terrain` | 2 | 33 | 4 valeurs, sample plus large |
+| `multivalue_smooth` | 3 | 12 | 4 valeurs, motifs lisses |
+| `multivalue_terrain` | 3 | 73 | Très contraint, échoue |
 
-Pour `multivalue_terrain` avec `N=2`, le solveur série prend ~70 ms sur
-32×32, ~520 ms sur 64×64. Le coût croît plus vite que linéairement à cause
-du nombre de tuiles : à `L=33`, chaque popcount/intersection coûte 2× plus
-cher qu'à `L=11`. Le ratio parallèle/série s'améliore : à 4 threads sur
-64×64 multivaleurs, on observe **3.1× de speedup** (vs ~2.9× pour `L=11`).
+`terrain_L33` 128×128 atteint 5.69× à 8 threads (vs 5.27× pour
+binary_L11) : plus de tuiles → plus de bits manipulés par cellule →
+meilleur amortissement de l'overhead OMP.
 
-## 4.4. Choix de la taille de tuile N
+`smooth_N3` plafonne à 2.23× au peak (4 threads) sur 128×128 — beaucoup
+moins parallélisable. Cause : 12 tuiles × 25 offsets = 300 ops par
+cellule, frontières BFS courtes (motifs lisses = peu de propagation).
+La barrière BFS et le fork/join coûtent autant que le travail utile à
+partir de 8 threads. Atténué par l'optim « min-entropy work-density
+gate » qui sérialise les niveaux trop petits, et par l'optim
+« parallel attempts » qui contourne le problème.
 
-Avec `N = 3` sur l'échantillon `multivalue_terrain`, le tile set explose
-(`L = 73`), les contraintes deviennent trop serrées et l'algorithme échoue
-(« contradiction » sur les 5 tentatives). Avec `N = 2`, `L = 33` et le solveur
-réussit en une tentative. C'est un trade-off classique de WFC : N plus grand =
-résultats plus fidèles mais plus difficile à résoudre. **Conclusion :** pour
-l'usage courant, `N = 2` ou `N = 3` selon la régularité de l'échantillon.
+## 4.4. Optim « parallel attempts »
+
+Plutôt que de paralléliser à l'intérieur d'un attempt, on lance K
+attempts WFC indépendants en parallèle (chacun avec son propre `Wave`,
+son propre seed `seed + k * φ`) et on garde le succès d'index minimum.
+La sortie reste déterministe : un retry séquentiel aurait choisi le
+même attempt.
+
+Mesure locale (`win-i9`, terrain N=3 24×24, total wallclock sur 4 seeds) :
+
+| Mode | Total | Speedup |
+|---|---|---|
+| `--parallel-attempts 1 --threads 1` | 0.510 s | 1.0× |
+| `--parallel-attempts 4 --threads 4` | 0.332 s | 1.54× |
+| `--parallel-attempts 8 --threads 8` | 0.238 s | 2.14× |
+
+Cette optim paie sur les workloads où chaque attempt a un risque
+d'échec (terrain N=3, cellules tightly constrained). Elle est inutile
+sur les workloads qui réussissent toujours du premier coup
+(binary_5x5, smooth_N3) — les K attempts sont K× le travail pour le
+même résultat.
+
+## 4.5. Choix de la taille de tuile N
+
+Avec `N = 3` sur `multivalue_terrain`, `L = 73` et l'algorithme échoue
+sur les petites grilles (taux de succès ~10%). Avec `N = 2`, `L = 33`
+et le solveur réussit en 1-2 attempts. C'est le trade-off classique de
+WFC : N plus grand = motifs plus fidèles mais problème plus serré.
 
 # 5. Extension multi-valeurs
 
@@ -314,23 +357,28 @@ Le projet remplit les trois objectifs du sujet :
 - **Série** : référence correcte, vérifiée par tests unitaires et
   comparaison `diff` avec les versions parallèles ;
 - **Parallèle** : implémentation OpenMP avec `#pragma omp task` explicite
-  donnant un speedup de **3.3× à 8 threads** sur 128×128, ainsi qu'une variante
-  Kokkos pour comparaison ;
-- **Multi-valeurs** : extension naturelle, démontrée sur deux échantillons
-  visuels.
+  donnant un speedup peak de 8.23× à 16 threads sur 256×256
+  (Romeo, AMD EPYC 9654), plus une variante Kokkos pour comparaison ;
+- **Multi-valeurs** : extension naturelle, démontrée sur trois
+  échantillons visuels (terrain, maze, smooth).
 
 **Pistes d'amélioration** :
 
-1. **Parallélisme à grain fin** : au lieu de tasks par chunk, utiliser SIMD
-   (AVX2/AVX-512) sur les opérations de bitset pour accélérer même la version
-   série.
-2. **Backtracking au lieu de retry** : sur contradiction, restaurer le
-   dernier point de décision plutôt que de tout recommencer.
-3. **Heuristique d'entropie partagée** : maintenir une priority queue avec
-   lazy invalidation pour éviter le scan complet à chaque collapse.
-4. **Symétries** : le sujet mentionne rotations/reflexions des tuiles
-   (extension classique) ; implémentation immédiate au niveau de
-   `TileSet::from_sample`.
-5. **Backend GPU Kokkos** : ré-architecturer la wave en `Kokkos::View<u64**>`
-   pour viser CUDA/HIP, ce qui ferait passer la limite à des grilles
-   1024×1024 en quelques secondes.
+1. **NUMA-aware partitioning** : actuellement la wave est un tableau
+   plat partagé. Un partitionnement par socket (96 cellules par tâche
+   sur EPYC 9654) éliminerait les atomics inter-NUMA qui dominent au-
+   delà de 32 threads. Évalué dans CHOICES.md (~500 lignes, risque élevé,
+   bénéfice probable +30-50% à 64-192 threads).
+2. **GPU CUDA via Kokkos** : déjà fonctionnel sur GH200 mais lent — les
+   H↔D copies par propagate dominent. Le port nécessiterait un re-design
+   batch (résoudre N petits problèmes en parallèle dans un seul kernel)
+   pour amortir les transferts.
+3. **Heuristique d'entropie incrémentale** : maintenir une priority
+   queue avec lazy invalidation au lieu de re-scanner toute la wave à
+   chaque collapse — la sélection passerait de 85% à <10% du temps
+   total.
+4. **Symétries** : rotations/reflexions des tuiles (extension classique
+   de WFC) au niveau de `TileSet::from_sample`. Multiplie par 8 le
+   nombre de tuiles disponibles sans agrandir l'échantillon.
+5. **SIMD bitset** : AVX2/AVX-512 sur les opérations AND/OR
+   `Bitset` pour accélérer même la version série quand `L > 64`.

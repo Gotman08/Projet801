@@ -57,10 +57,13 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Six suites cœur (`test_bitset`, `test_grid`, `test_grid_io`, `test_tileset`,
-`test_overlap`, `test_solver`) plus deux conditionnels (`test_solver_omp`,
-`test_solver_kokkos`) qui vérifient le déterminisme bit-à-bit serial vs
-backend parallèle pour {1, 2, 4, 8} threads.
+10 suites cœur (`test_bitset`, `test_grid`, `test_grid_io`,
+`test_tileset`, `test_overlap`, `test_wave`, `test_solver_common`,
+`test_solver`, `test_edge_cases`, `test_parallel_attempts`) plus trois
+conditionnels (`test_solver_omp`, `test_solver_kokkos`,
+`test_kokkos_autoinit`) qui vérifient le déterminisme bit-à-bit serial
+vs backend parallèle pour {1, 2, 4, 8} threads, et le succès
+d'index minimum en mode parallel-attempts.
 
 ## Usage
 
@@ -92,12 +95,19 @@ OMP_NUM_THREADS=8 ./build/wfc_omp samples/binary_5x5.txt --rows 128 --cols 128 \
 | `--rows`, `--cols` | dimensions de la grille de sortie            |
 | `-N`              | taille de tuile (défaut 2)                   |
 | `--seed`          | seed RNG (output déterministe pour un seed donné) |
-| `--attempts`      | nombre de retentatives sur contradiction     |
+| `--attempts`      | nombre maximal de retentatives sur contradiction |
+| `--parallel-attempts K` | lance K attempts en parallèle, garde le succès d'index minimum (défaut 1) |
 | `--threads`       | threads (OMP)                                |
 | `--scale`         | facteur de zoom du rendu PPM/PNG             |
 | `--out FILE.txt`  | écriture de la grille texte                  |
 | `--ppm FILE.ppm`  | rendu PPM (P6)                               |
 | `--png FILE.png`  | rendu PNG via `stb_image_write.h`            |
+
+`--parallel-attempts` paie sur les workloads serrés où chaque attempt a
+un risque d'échec (ex. terrain N=3) : 2.14× wallclock observé à K=8 vs
+K=1 sur terrain N=3 24×24. Inutile sur les workloads qui réussissent
+toujours du premier coup — K attempts = K× le travail pour le même
+résultat.
 
 ## Format des échantillons
 

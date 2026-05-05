@@ -53,6 +53,19 @@ private:
                      std::uint64_t seed,
                      std::mt19937_64& rng,
                      SolverStats& stats);
+
+    // Sequential retry loop (parallel_attempts = 1, legacy path).
+    Grid solve_sequential(const TileSet& tiles,
+                          const OverlapRules& rules,
+                          const SolverOptions& opt,
+                          SolverStats& stats);
+
+    // Batched parallel attempts (parallel_attempts > 1). Runs K serial
+    // attempts in parallel; the lowest-indexed success determines the output.
+    Grid solve_parallel(const TileSet& tiles,
+                        const OverlapRules& rules,
+                        const SolverOptions& opt,
+                        SolverStats& stats);
 };
 
 } // namespace wfc
