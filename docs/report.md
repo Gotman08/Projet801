@@ -185,7 +185,62 @@ sequential. Inutile sur les workloads qui ne ratent jamais (binary_5x5)
 mais c'est précisément là que la parallélisation intra-attempt
 fonctionne déjà bien.
 
-## 3.5. Déterminisme
+## 3.5. Symétries D4 (option)
+
+Le tile set peut être étendu par rotations 90° / 180° / 270° et leurs
+réflexions horizontales (groupe diédral D4). Activé via
+`SolverOptions` ou `--symmetries S` avec `S ∈ {1, 2, 4, 8}`. À S=1
+(défaut), le code path est strictement identique au comportement
+historique : aucun if-check supplémentaire dans la hot path
+d'extraction.
+
+L'expansion se fait une fois lors de `TileSet::from_sample`. Les
+patterns auto-symétriques (uniformes, damiers) ne voient pas leur
+fréquence double-comptée, dédup par hash de contenu. Le solveur
+ne sait pas que les tuiles viennent de symétries, il voit juste un
+`L` plus grand. Effet pratique : sur des samples avec une orientation
+préférée (chemins, escaliers), `--symmetries 4` permet d'appliquer
+le motif uniformément dans toutes les orientations.
+
+Coût : `L'` peut passer jusqu'à 8× → bitsets parfois à 2 mots
+au lieu de 1 → solveur ~1.5× plus lent. Cohérent : plus de variantes
+= plus de choix par cellule.
+
+## 3.6. Backtracking (option)
+
+Sur les samples très contraints (terrain N=3 sur petite grille),
+restart-on-contradiction épuise rapidement `max_attempts` sans
+trouver de solution. `--backtrack` remplace cette stratégie par un
+parcours arborescent : chaque collapse pousse une frame
+`{cellule, choix restants, delta}` sur une pile ; en cas de
+contradiction la frame est dépilée et le choix suivant est essayé.
+
+Choix de design clés :
+
+1. **Delta-encoded snapshot** : chaque frame stocke uniquement les
+   cellules effectivement modifiées par sa propagation. Mémoire :
+   ~50 cellules × words_per_cell × 16 octets par frame, vs
+   rows·cols·words_per_cell × 8 octets pour un snapshot plein. ~80×
+   moins de mémoire sur 64×64 binaire. La variante interne
+   `serial_propagate_with_delta` peek le pre-state en stack scratch
+   et ne commit dans le delta que si `and_with` mute la cellule.
+2. **Choix triés par fréquence descendante** : la tuile la plus
+   fréquente est essayée en premier. Heuristique « try the most
+   likely candidate ».
+3. **Bypass complet du backend parallèle intra-attempt** : le
+   snapshot/restore n'a de sens qu'en single-threaded. Quand
+   `use_backtracking=true`, `solve_sequential` invoque directement
+   `serial_run_attempt_backtrack` au lieu de la dispatch backend.
+4. **Composition avec parallel-attempts** : `--parallel-attempts K
+   --backtrack` lance K recherches backtrack indépendantes (seeds
+   dérivés → ordres de tie-break différents → arbres d'exploration
+   différents). Succès d'index minimum gagne. Forme classique de
+   « parallel backtracking via independent searches ».
+
+Mesure : terrain N=3 32×32 où retry-30-attempts échoue en 0.38 s,
+`--backtrack` résout en 0.12 s.
+
+## 3.7. Déterminisme
 
 Conserver la propriété « même seed → même output » à travers les backends a
 nécessité deux décisions :

@@ -8,11 +8,11 @@ Liste explicite des invariants vérifiés et de ce qui n'est pas couvert.
 ctest --test-dir build --output-on-failure
 ```
 
-Sans Kokkos : 11 suites (`test_bitset`, `test_grid`, `test_grid_io`,
+Sans Kokkos : 13 suites (`test_bitset`, `test_grid`, `test_grid_io`,
 `test_tileset`, `test_overlap`, `test_wave`, `test_solver_common`,
 `test_solver`, `test_edge_cases`, `test_parallel_attempts`,
-`test_solver_omp`).
-Avec `-DUSE_KOKKOS=ON` : 13 suites (ajoute `test_solver_kokkos` et
+`test_symmetries`, `test_backtrack`, `test_solver_omp`).
+Avec `-DUSE_KOKKOS=ON` : 15 suites (ajoute `test_solver_kokkos` et
 `test_kokkos_autoinit`).
 
 Chaque suite est un binaire indépendant ; chacun rapporte
@@ -31,11 +31,13 @@ Chaque suite est un binaire indépendant ; chacun rapporte
 | `test_solver_common`    |  9 060  | entropy, weighted_pick (incl. zero-weight), jitter, build_output deterministic |
 | `test_solver`           |     71  | end-to-end serial : déterminisme + soundness     |
 | `test_edge_cases`       |    404  | failure paths, scale<1, validate, garbage parsing, stb png failure, retry exhaustion |
-| `test_parallel_attempts` |    10  | parallel_attempts validation, déterminisme lowest-success, retry boost terrain N=3, parité OMP/serial à K>1 |
-| `test_solver_omp`       |     33  | déterminisme OMP avec success checks bilatéraux, contradiction, multivalue |
+| `test_parallel_attempts` |    16  | parallel_attempts validation, déterminisme lowest-success, retry boost terrain N=3, parité OMP/serial à K>1 |
+| `test_symmetries`       |     66  | rotated_90⁴ = id, reflected² = id, S=1 = legacy bit-à-bit, monotonic growth S=2/4/8, dédup auto-symétriques, validation S invalides |
+| `test_backtrack`        |    520  | use_backtracking=false unchanged, soundness, succès sur sample tight où retry-1 échoue, déterminisme |
+| `test_solver_omp`       |     36  | déterminisme OMP avec success checks bilatéraux, contradiction, multivalue |
 | `test_solver_kokkos`    |     22  | déterminisme Kokkos avec success checks bilatéraux, contradiction, multivalue |
 | `test_kokkos_autoinit`  |      3  | chemin auto-init/finalize de Kokkos             |
-| TOTAL                   | 24 385  | |
+| TOTAL                   | 24 980  | |
 
 ## Couverture (gcovr 8.6, build_cov)
 
@@ -243,6 +245,27 @@ ajoute un fichier `tests/test_xxx.cpp`, on l'enregistre dans
 | OMP backend avec K=4 = serial backend avec K=4 bit-à-bit  | OK      |
 | OMP backend K=1 retombe sur le chemin séquentiel legacy   | OK      |
 
+### Symétries D4 ([test_symmetries](../tests/test_symmetries.cpp))
+
+| Invariant                                                | Vérifié |
+|----------------------------------------------------------|---------|
+| `Tile::rotated_90()` appliqué 4 fois = identité           | OK      |
+| `Tile::reflected_horizontal()` appliqué 2 fois = identité | OK      |
+| `from_sample(g, N)` (legacy) = `from_sample(g, N, 1)`     | OK      |
+| Sample uniforme : S=1, 2, 4, 8 → tile set de taille 1     | OK      |
+| Sample asymétrique : taille croissante S=1 ≤ 2 ≤ 4 ≤ 8   | OK      |
+| `symmetries ∈ {0, 3, -4}` → `std::invalid_argument`       | OK      |
+| Auto-symétrie ne double-compte pas la fréquence           | OK      |
+
+### Backtracking ([test_backtrack](../tests/test_backtrack.cpp))
+
+| Invariant                                                | Vérifié |
+|----------------------------------------------------------|---------|
+| `use_backtracking=false` (défaut) inchangé bit-à-bit      | OK      |
+| Sample facile + backtrack : succès, soundness             | OK      |
+| Sample serré (terrain N=2) où retry-1 échoue : succès     | OK      |
+| Même seed + backtrack → même sortie (deux solveurs)        | OK      |
+
 ### Solveur Kokkos ([test_solver_kokkos](../tests/test_solver_kokkos.cpp))
 
 | Invariant                                                | Vérifié |
@@ -257,10 +280,10 @@ ajoute un fichier `tests/test_xxx.cpp`, on l'enregistre dans
 | Performance                           | tests = correctness ; perf = benchmarks               |
 | CLI parsing                           | trivial, déléguer à des tests d'intégration          |
 | Apps complets (`wfc_serial`, etc.)    | testés indirectement par les tests solveur + benchmark |
-| Symétries (rotations/reflexions)      | non implémentées                                      |
 | Gros samples (>32×32)                  | trop lent pour ctest, mais indirectement via benchmark |
 | Wraparound de Value (uint8_t)         | pas de scénario de test naturel                        |
 | Retour `Grid::at_torus(0, 0, 0, 0)` quand grid est 0×0 | UB (pas de cas d'usage légitime) |
+| Backtrack sur GPU (Kokkos CUDA)       | snapshot/restore single-thread par construction, non applicable |
 
 ## Race detection
 

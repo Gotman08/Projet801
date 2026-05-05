@@ -217,6 +217,64 @@ i9-10900K). Inutile sur les workloads qui réussissent du premier
 coup, K attempts en parallèle = K× le travail pour le même
 résultat.
 
+## Symétries D4 (option `--symmetries S`)
+
+Extension classique de WFC : chaque tuile extraite peut générer ses
+variantes par rotation et réflexion. `TileSet::from_sample(grid, N, S)`
+implémente le groupe diédral D4 (`S ∈ {1, 2, 4, 8}`) :
+
+- S=1 : identité seule (défaut, comportement legacy bit-à-bit)
+- S=2 : rotation 180°
+- S=4 : 4 rotations (0°, 90°, 180°, 270°)
+- S=8 : 4 rotations + 4 réflexions horizontales
+
+L'expansion se fait à l'extraction, le solveur ne voit qu'un `L` plus
+grand. Les patterns auto-symétriques (uniformes, damiers) sont
+dédupés par hash de contenu pour ne pas double-compter leur fréquence.
+
+Bénéfice : sur des samples avec une orientation préférée (chemins,
+escaliers, branchages), `--symmetries 4` permet d'appliquer le motif
+uniformément dans toutes les orientations. Coût : `L` × jusqu'à 8 →
+bitsets parfois à 2 mots → solveur ~1.5× plus lent.
+
+## Backtracking (option `--backtrack`)
+
+Sur les samples très contraints, restart-on-contradiction épuise
+`max_attempts` sans trouver de solution. `--backtrack` remplace cette
+stratégie par un parcours arborescent du domaine.
+
+```
+stack = []
+loop:
+   cell = serial_min_entropy()
+   if cell < 0: success
+   open frame {cell, candidates_sorted_by_freq_desc, empty_delta}
+   try_top()  # essaie un candidat, propage, capture delta
+   if forward progress: continue
+   else:
+      while stack non-empty:
+         apply_inverse(stack.top.delta)
+         if stack.top has more candidates: try_top()
+         else: pop stack
+      if stack empty: failure
+```
+
+Choix de design (détaillés dans [CHOICES.md](CHOICES.md)) :
+
+1. **Delta-encoded snapshot** : chaque frame stocke uniquement les
+   cellules effectivement modifiées par sa propagation. ~80× moins
+   de mémoire qu'un snapshot complet.
+2. **Choix triés par fréquence descendante** : essai du candidat le
+   plus probable en premier.
+3. **Bypass backend parallèle** : snapshot/restore est single-thread
+   par construction.
+4. **Composition avec parallel-attempts** : `--parallel-attempts K
+   --backtrack` lance K recherches indépendantes (seeds différents,
+   arbres d'exploration différents).
+
+Mesure : terrain N=3 32×32, retry-30-attempts échoue en 0.38 s,
+`--backtrack` résout en 0.12 s.
+
 ## Complexité
 
 | Étape                | Complexité                                | Pour 128×128, L=11    |

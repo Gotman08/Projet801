@@ -63,9 +63,17 @@ intrinsics `__builtin_popcountll` / `__builtin_ctzll` (avec fallback MSVC
 `__popcnt64` / `_BitScanForward64`).
 
 ### `TileSet` ([include/wfc/TileSet.hpp](../include/wfc/TileSet.hpp))
-Construit par `TileSet::from_sample(grid, N)`. Extraction toroïdale :
-chaque position `(r0, c0)` génère un tile en lisant `N×N` valeurs avec
-wrap-around. Déduplication via `std::unordered_map<Tile, int, TileHash>`.
+Construit par `TileSet::from_sample(grid, N, symmetries=1)`. Extraction
+toroïdale : chaque position `(r0, c0)` génère un tile en lisant `N×N`
+valeurs avec wrap-around. Déduplication via
+`std::unordered_map<Tile, int, TileHash>`.
+
+Param `symmetries` (1, 2, 4, 8) active l'expansion D4 du tile set
+(rotations + réflexions horizontales). À S=1 (défaut), comportement
+strictement identique au legacy. À S>1, chaque pattern génère ses
+variantes `D4` qui sont dédupées par hash : les patterns
+auto-symétriques ne voient pas leur fréquence double-comptée. Coût
+unique à l'extraction, hot path solver inchangé.
 
 ### `OverlapRules` ([include/wfc/OverlapRules.hpp](../include/wfc/OverlapRules.hpp))
 Table de compatibilité `tile × offset → bitset_de_tiles`. Pour des tiles
@@ -124,6 +132,8 @@ Helpers purs partagés entre tous les backends :
 - `serial_min_entropy(wave, freq, seed)`, scan séquentiel (utilisé par Serial et Kokkos)
 - `serial_propagate(wave, rules, start, &props)`, BFS séquentiel
 - `serial_run_attempt(wave, tiles, rules, seed, rng, stats)`, pick → collapse → propagate sériel complet, utilisé par l'orchestrateur parallel-attempts
+- `serial_run_attempt_backtrack(wave, tiles, rules, seed, stats)`, recherche arborescente avec snapshot/restore (mode `--backtrack`), delta-encoded pour minimiser la mémoire
+- `serial_propagate_with_delta(wave, rules, start, &props, delta, touched)`, variante de `serial_propagate` qui enregistre les modifications cellule-par-cellule dans `delta` pour un rollback sélectif
 - `build_output(wave, tiles)`, reconstruit la grille finale
 
 ### `WFCSolverSerial` ([src/solvers/WFCSolverSerial.cpp](../src/solvers/WFCSolverSerial.cpp))
