@@ -1,8 +1,6 @@
 \chapter{Parallélisation Kokkos et portabilité GPU}
 \label{chap:kokkos}
 
-\epigraph{\textit{``Performance portability without sacrificing performance.''}}{--- Kokkos design goal}
-
 Le sujet propose Kokkos comme alternative à OpenMP. Nous l'avons implémenté à la fois pour répondre à cette option et pour explorer la \textbf{portabilité GPU} : avec Kokkos, le même code source compile pour OpenMP, CUDA, HIP, ou SYCL selon le backend choisi à la compilation.
 
 \section{Pourquoi Kokkos ?}
@@ -16,7 +14,7 @@ Sans Kokkos, porter WFC sur GPU exigerait :
     \item L'apprentissage d'un dialecte par vendor (NVIDIA / AMD / Intel).
 \end{itemize}
 
-Kokkos abstrait ces différences. Le développeur écrit un \textbf{kernel parallèle} (\texttt{Kokkos::parallel\_for}) avec des \textbf{vues} (\texttt{Kokkos::View<T*>}) ; le compilateur Kokkos génère le code adapté au backend cible.
+Kokkos abstrait ces différences. Le développeur écrit un \textbf{kernel parallèle} (\texttt{parallel\_for}) avec des \textbf{vues} (\texttt{View<T*>}) ; le compilateur Kokkos génère le code adapté au backend cible.
 
 \subsection{Tradeoffs}
 
@@ -32,7 +30,7 @@ Kokkos abstrait ces différences. Le développeur écrit un \textbf{kernel paral
 
 \begin{figure}[H]
 \centering
-\schemaImage{Architecture Kokkos avec branche kHostOnly}
+\includegraphics[width=0.85\linewidth]{results/figures/schemas/kokkos_architecture.png}
 \caption{Architecture Kokkos pour la propagation BFS, avec branche \texttt{kHostOnly} compile-time choisissant zero-copy ou deep\_copy.}
 \label{fig:kokkos_architecture}
 \end{figure}
@@ -149,7 +147,7 @@ Relaxed-load skip avant atomic & \texttt{Kokkos::atomic\_load} puis \texttt{Kokk
 \midrule
 CAS dedup sur in\_queue & \texttt{Kokkos::atomic\_compare\_exchange} \\
 \midrule
-Counter atomique pour next\_frontier & \texttt{Kokkos::atomic\_fetch\_add(\&next\_count(0), 1)} \\
+Counter atomique \texttt{next\_frontier} & \texttt{atomic\_fetch\_add(\&next\_count(0), 1)} \\
 \bottomrule
 \end{tabularx}
 \caption{Optimisations OMP transposées au backend Kokkos. Le code device respecte les mêmes invariants algorithmiques.}
@@ -198,7 +196,7 @@ Une décision de design importante : la sélection min-entropie reste \textbf{su
     \item En pratique, la propagation domine le temps GPU (les transferts host↔device par propagate sont le vrai bottleneck, voir Chapitre~\ref{chap:resultats}).
 \end{itemize}
 
-Une optimisation future serait de mirrorer le wave une fois au début du solve, et faire min-entropy sur device avec un kernel séparé. Documenté comme piste future dans \texttt{docs/CHOICES.md}.
+Une optimisation future : mirrorer la wave une fois au début du solve et exécuter min-entropy sur device avec un kernel séparé. Documenté dans \texttt{docs/CHOICES.md}.
 
 % =============================================================================
 \section{Validation GPU sur Romeo armgpu}
@@ -207,23 +205,11 @@ Une optimisation future serait de mirrorer le wave une fois au début du solve, 
 
 \subsection{Build CUDA}
 
-Sur la partition \texttt{armgpu} de Romeo (NVIDIA GH200, sm\_90), le script \texttt{scripts/build\_kokkos\_gpu\_romeo.slurm} effectue :
-
-\begin{lstlisting}[language=bash]
-spack load gcc@11.4.1 cmake ninja cuda@12.9
-cmake -S external/kokkos/src -B external/kokkos/build_cuda -G Ninja \
-    -DKokkos_ENABLE_CUDA=ON \
-    -DKokkos_ENABLE_SERIAL=ON \
-    -DKokkos_ARCH_HOPPER90=ON \
-    -DCMAKE_INSTALL_PREFIX=$PWD/external/kokkos/install_cuda
-cmake --build external/kokkos/build_cuda -j
-cmake --install external/kokkos/build_cuda
-
-cmake -B build_cuda -G Ninja -DCMAKE_BUILD_TYPE=Release \
-    -DUSE_OMP=ON -DUSE_KOKKOS=ON -DUSE_LTO=ON \
-    -DKokkos_ROOT=$PWD/external/kokkos/install_cuda
-cmake --build build_cuda -j
-\end{lstlisting}
+Sur la partition \texttt{armgpu} de Romeo (NVIDIA GH200, sm\_90), un
+script SLURM compile Kokkos avec
+\texttt{Kokkos\_ENABLE\_CUDA=ON} et
+\texttt{Kokkos\_ARCH\_HOPPER90=ON}, puis link le projet contre cette
+installation. Commandes en Annexe~\ref{sec:annexes:build}.
 
 \subsection{Tests GPU}
 

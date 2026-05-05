@@ -1,47 +1,45 @@
 \chapter{Implémentation C++ et ingénierie logicielle}
 \label{chap:implementation}
 
-\epigraph{\textit{``Any fool can write code that a computer can understand. Good programmers write code that humans can understand.''}}{--- Martin Fowler}
-
 \section{Organisation du dépôt}
 
 Le projet est organisé selon une architecture modulaire séparant clairement les interfaces, les implémentations, et les points d'entrée.
 
 \subsection{Structure des répertoires}
 
-\begin{lstlisting}[language=bash, caption={Arborescence du projet WFC}]
+\begin{verbatim}
 Projet801/
-├── include/wfc/         # Headers publics
-│   ├── Grid.hpp           # Domaine 2D
-│   ├── Tile.hpp           # Sous-bloc N×N + helpers symétries
-│   ├── Bitset.hpp         # Bitset packé sur uint64_t
-│   ├── TileSet.hpp        # Catalogue de tuiles + fréquences
-│   ├── OverlapRules.hpp   # Compatibilités tuile×offset
-│   ├── Wave.hpp           # Superposition par cellule
-│   ├── WFCSolver.hpp      # Interface solver + SolverOptions/Stats
-│   ├── GridIO.hpp         # I/O txt, PPM, PNG
-│   ├── solvers/           # Backends spécialisés
-│   │   ├── WFCSolverSerial.hpp
-│   │   ├── WFCSolverOMP.hpp
-│   │   └── WFCSolverKokkos.hpp
-│   └── internal/          # Helpers et base class
-│       ├── WFCSolverBase.hpp
-│       └── SolverCommon.hpp
-├── src/                 # Implémentations correspondantes
-├── apps/                # Points d'entrée
-│   ├── wfc_serial.cpp
-│   ├── wfc_omp.cpp
-│   ├── wfc_kokkos.cpp
-│   ├── benchmark.cpp
-│   └── wfc_dungeon.cpp    # Démo UE5 (opt-in BUILD_DUNGEON)
-├── tests/               # Suite de tests unitaires (15 suites)
-├── samples/             # Grilles d'entrée
-├── scripts/             # SLURM, plot, analyze, render
-├── results/             # CSV de benchmarks
-├── docs/                # Documentation projet (ARCHITECTURE, ALGORITHM, etc.)
-├── ue5_plugin/          # Plugin Unreal Engine 5.7
-└── third_party/         # stb_image_write.h
-\end{lstlisting}
+  include/wfc/             # Headers publics
+    Grid.hpp                 # Domaine 2D
+    Tile.hpp                 # Sous-bloc NxN + helpers symetries
+    Bitset.hpp               # Bitset packe sur uint64_t
+    TileSet.hpp              # Catalogue de tuiles + frequences
+    OverlapRules.hpp         # Compatibilites tuile x offset
+    Wave.hpp                 # Superposition par cellule
+    WFCSolver.hpp            # Interface solver + SolverOptions/Stats
+    GridIO.hpp               # I/O txt, PPM, PNG
+    solvers/                 # Backends specialises
+      WFCSolverSerial.hpp
+      WFCSolverOMP.hpp
+      WFCSolverKokkos.hpp
+    internal/                # Helpers et base class
+      WFCSolverBase.hpp
+      SolverCommon.hpp
+  src/                     # Implementations correspondantes
+  apps/                    # Points d'entree
+    wfc_serial.cpp
+    wfc_omp.cpp
+    wfc_kokkos.cpp
+    benchmark.cpp
+    wfc_dungeon.cpp          # Demo UE5 (opt-in BUILD_DUNGEON)
+  tests/                   # Suite de tests unitaires (15 suites)
+  samples/                 # Grilles d'entree
+  scripts/                 # SLURM, plot, analyze, render
+  results/                 # CSV de benchmarks
+  docs/                    # Documentation projet
+  ue5_plugin/              # Plugin Unreal Engine 5.7
+  third_party/             # stb_image_write.h
+\end{verbatim}
 
 \subsection{Modules et responsabilités}
 
@@ -112,7 +110,7 @@ Choix : un seul \texttt{vector<u64>} contigu de taille $r \cdot c \cdot \text{wo
 
 \begin{figure}[H]
 \centering
-\schemaImage{Layout flat de la Wave avec BitsetView}
+\includegraphics[width=0.85\linewidth]{results/figures/schemas/wave_memory_layout.png}
 \caption{Wave en mémoire : un seul buffer contigu, partagé par tous les threads, avec accès via BitsetView.}
 \label{fig:wave_layout}
 \end{figure}
@@ -193,15 +191,14 @@ Le \texttt{CMakeLists.txt} produit trois libs distinctes plutôt qu'une lib mono
 
 \begin{table}[H]
 \centering
-\begin{tabularx}{\textwidth}{lXl}
+\small
+\begin{tabularx}{\textwidth}{lXX}
 \toprule
 \textbf{Cible CMake} & \textbf{Sources} & \textbf{Dépend de} \\
 \midrule
-\texttt{wfc\_core} & Grid, TileSet, OverlapRules, Wave, GridIO, SolverCommon, WFCSolverBase, WFCSolverSerial & OpenMP::OpenMP\_CXX si \texttt{USE\_OMP=ON} (pour la construction parallèle des règles) \\
-\midrule
-\texttt{wfc\_omp\_lib} & WFCSolverOMP & wfc\_core, OpenMP::OpenMP\_CXX \\
-\midrule
-\texttt{wfc\_kokkos\_lib} & WFCSolverKokkos & wfc\_core, Kokkos::kokkos \\
+\texttt{wfc\_core} & Grid, TileSet, OverlapRules, Wave, GridIO, SolverCommon, WFCSolverBase, WFCSolverSerial & OpenMP si \texttt{USE\_OMP=ON} (construction parallèle des règles) \\
+\texttt{wfc\_omp\_lib} & WFCSolverOMP & wfc\_core, OpenMP \\
+\texttt{wfc\_kokkos\_lib} & WFCSolverKokkos & wfc\_core, Kokkos \\
 \bottomrule
 \end{tabularx}
 \caption{Cibles CMake et leurs dépendances.}
@@ -214,16 +211,17 @@ Le \texttt{CMakeLists.txt} produit trois libs distinctes plutôt qu'une lib mono
 
 \begin{table}[H]
 \centering
-\begin{tabularx}{\textwidth}{lll>{\hsize=2\hsize}X}
+\small
+\begin{tabularx}{\textwidth}{llXX}
 \toprule
 \textbf{Option} & \textbf{Défaut} & \textbf{Effet} & \textbf{Notes} \\
 \midrule
 \texttt{CMAKE\_BUILD\_TYPE} & Release & \texttt{-O3 -march=native} & Debug : \texttt{-O0 -g3} \\
 \texttt{USE\_OMP} & ON & wfc\_omp\_lib + tests OMP & \\
 \texttt{USE\_KOKKOS} & OFF & wfc\_kokkos\_lib + tests Kokkos & \texttt{Kokkos\_ROOT} requis \\
-\texttt{USE\_LTO} & OFF & Link-Time Optimization & +3.4\% mesuré, A/B sur 11 runs \\
-\texttt{BUILD\_DUNGEON} & OFF & wfc\_dungeon CLI + UE5 plugin & \\
-\texttt{USE\_TSAN} & OFF & ThreadSanitizer (race detection) & Incompatible ASAN, LTO \\
+\texttt{USE\_LTO} & OFF & Link-Time Optim & +3.4\% sur 11 runs A/B \\
+\texttt{BUILD\_DUNGEON} & OFF & wfc\_dungeon + UE5 plugin & \\
+\texttt{USE\_TSAN} & OFF & ThreadSanitizer & Incompatible ASAN, LTO \\
 \texttt{USE\_ASAN} & OFF & AddressSanitizer + UBSan & Incompatible LTO \\
 \texttt{BUILD\_TESTING} & ON & Suite de tests ctest & \\
 \bottomrule

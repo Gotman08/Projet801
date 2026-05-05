@@ -1,8 +1,6 @@
 \chapter{Extensions algorithmiques}
 \label{chap:extensions}
 
-\epigraph{\textit{``Extensions should compose. Extensions should be optional. Extensions should not slow the default path.''}}{--- Ingénierie logicielle pragmatique}
-
 Au-delà du sujet de base, le projet livre quatre extensions optionnelles. Toutes sont \textbf{opt-in} : leur activation se fait via un flag CLI ou une option CMake, et le chemin par défaut reste strictement inchangé en performance.
 
 \section{Parallel attempts : K essais indépendants en parallèle}
@@ -35,7 +33,7 @@ L'analyse du speedup OMP intra-attempt (Chapitre~\ref{chap:resultats}) révèle 
 \subsection{Garantie de déterminisme}
 
 \begin{theorem}[Déterminisme parallel-attempts]
-Pour un même seed initial, $\texttt{parallel\_attempts}=K$ produit la même sortie qu'un retry séquentiel avec $\texttt{max\_attempts}=K$.
+Pour un même seed initial, \texttt{parallel\_attempts=K} produit la même sortie qu'un retry séquentiel avec \texttt{max\_attempts=K}.
 \end{theorem}
 
 \begin{proof}
@@ -287,7 +285,7 @@ WFC est massivement utilisé pour la génération de niveaux dans les jeux. Pour
 
 \begin{figure}[H]
 \centering
-\schemaImage{Pipeline wfc-dungeon vers UE5 plugin}
+\includegraphics[width=0.95\linewidth]{results/figures/schemas/ue5_pipeline.png}
 \caption{Pipeline asset → JSON → spawn de meshes UE5 + gameplay actors.}
 \label{fig:ue5_pipeline}
 \end{figure}
@@ -330,22 +328,21 @@ qu'un joueur peut traverser tout le niveau.
 Le plugin \texttt{ue5\_plugin/WFCDungeon/} contient :
 
 \begin{itemize}
-    \item \texttt{UTileMappingDataAsset} : DataAsset qui mappe chaque \texttt{tile\_id} vers un struct \{floor, wall, corner, door StaticMesh* + \texttt{*MeshVariants} arrays\} + flags \texttt{bIsSolid}/\texttt{bIsDoor} + offset/scale. Les arrays de variants permettent de varier les meshes par tile id (random pick avec fallback single-mesh).
-    \item \texttt{ADungeonGenerator} : AActor qui parse le JSON, walke les cells, et spawne les \texttt{StaticMeshComponent} avec yaw cardinal (-90°N, +90°S, 0°E, 180°W).
+    \item \texttt{UTileMappingDataAsset} : mappe chaque \texttt{tile\_id} vers un struct \{floor, wall, corner, door, plus arrays \texttt{*MeshVariants}\} + flags \texttt{bIsSolid}/\texttt{bIsDoor} + offset/scale. Les variants permettent un \textit{random pick} par tile id (fallback single-mesh).
+    \item \texttt{ADungeonGenerator} : AActor qui parse le JSON, walk les cells, et spawne les \texttt{StaticMeshComponent} avec yaw cardinal (-90°N, +90°S, 0°E, 180°W).
 \end{itemize}
 
 \subsection{Gameplay actors et navmesh}
 
-Au-delà du spawn de meshes statiques, \texttt{ADungeonGenerator}
-expose des slots \texttt{TSubclassOf<AActor>} qui transforment le
-dungeon en mini-game scaffold prêt à l'emploi :
+\texttt{ADungeonGenerator} expose des slots \texttt{TSubclassOf<AActor>}
+pour transformer le dungeon en scaffold gameplay :
 
 \begin{itemize}
-    \item \texttt{PlayerStartClass} : placé sur les 4 cellules walkable les plus proches du centre.
-    \item \texttt{CornerSpawnerClass} (NPC spawners) : scattered sur \texttt{NumCornerSpawners} cellules walkable aléatoires.
-    \item \texttt{RandomPickupClass} : scattered sur \texttt{NumRandomPickups} cellules walkable aléatoires.
-    \item L'allocation garantit qu'aucune cellule n'héberge deux catégories d'actors simultanément.
-    \item Z-offsets séparés (\texttt{GameplayActorZOffsetCm}, \texttt{PlayerStartZOffsetCm}) pour positionner correctement les capsules \texttt{APlayerStart} (qui descendent ~88 cm sous leur origine) au-dessus du sol.
+    \item \texttt{PlayerStartClass} : 4 cellules walkable les plus proches du centre.
+    \item \texttt{CornerSpawnerClass} (NPC) : scattered sur \texttt{NumCornerSpawners} cellules.
+    \item \texttt{RandomPickupClass} : scattered sur \texttt{NumRandomPickups} cellules.
+    \item Allocation non-collisionnelle : aucune cellule n'héberge deux catégories.
+    \item Z-offsets dédiés (\texttt{GameplayActorZOffsetCm}, \texttt{PlayerStartZOffsetCm}) pour positionner les capsules au-dessus du sol.
 \end{itemize}
 
 \textbf{Volume de navigation auto-calculé} : un
@@ -395,21 +392,23 @@ plusieurs cellules walkable.}
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.95\linewidth]{results/figures/ue5/ue5_dungeon_02.png}
-\caption{Détail d'une intersection de couloirs : les meshes de sol
-sont choisis aléatoirement parmi
-\texttt{FloorMeshVariants} (variation visuelle), les walls sont
-orientés selon leurs voisins walkable. La connectivité globale
-walkable a été validée par flood-fill BFS avant spawn.}
+\caption[Détail d'une intersection de couloirs.]{Détail d'une
+intersection de couloirs : les meshes de sol sont choisis
+aléatoirement parmi \texttt{FloorMeshVariants} (variation visuelle),
+les walls sont orientés selon leurs voisins walkable. La
+connectivité globale walkable a été validée par flood-fill BFS
+avant spawn.}
 \label{fig:ue5_dungeon_02}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.95\linewidth]{results/figures/ue5/ue5_dungeon_03.png}
-\caption{Vue d'une pièce avec un \texttt{APlayerStart} (rendu par sa
-capsule), un NPC spawner et plusieurs pickups. L'allocation
-non-collisionnelle garantit qu'aucune cellule walkable n'héberge
-deux catégories d'actors. Le \texttt{ANavMeshBoundsVolume} couvre
-toute la grille, permettant l'IA NPC de naviguer.}
+\caption[Vue d'une pièce avec PlayerStart, NPC et pickups.]{Vue
+d'une pièce avec un \texttt{APlayerStart} (capsule), un NPC spawner
+et plusieurs pickups. L'allocation non-collisionnelle garantit
+qu'aucune cellule walkable n'héberge deux catégories d'actors. Le
+\texttt{ANavMeshBoundsVolume} couvre toute la grille pour la
+navigation IA.}
 \label{fig:ue5_dungeon_03}
 \end{figure}

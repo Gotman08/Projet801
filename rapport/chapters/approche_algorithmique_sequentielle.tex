@@ -1,8 +1,6 @@
 \chapter{Approche algorithmique séquentielle}
 \label{chap:approche}
 
-\epigraph{\textit{``The art of programming is the art of organizing complexity.''}}{--- Edsger W. Dijkstra}
-
 Ce chapitre détaille l'algorithme WFC tel que nous l'avons implémenté en série. Il sert de référence pour les chapitres parallèles : les versions OpenMP et Kokkos partagent exactement la même logique, seuls les schémas d'orchestration diffèrent.
 
 \section{Les six étapes de WFC}
@@ -57,7 +55,7 @@ Pour chaque paire de tuiles $(t_1, t_2)$ et chaque offset $(dx, dy) \in [-(N-1),
 
 \begin{figure}[H]
 \centering
-\schemaImage{Compatibilite overlap entre tuiles 2x2}
+\includegraphics[width=0.85\linewidth]{results/figures/schemas/overlap_compatibility.png}
 \caption{Convention d'overlap : $t_2$ placée à $(dx, dy)$ de $t_1$, les valeurs doivent coïncider sur la zone de recouvrement.}
 \label{fig:overlap_compatibility}
 \end{figure}
@@ -204,23 +202,18 @@ Notre suite de tests vérifie systématiquement plusieurs invariants algorithmiq
 
 \begin{table}[H]
 \centering
-\begin{tabularx}{\textwidth}{lX}
+\small
+\begin{tabularx}{\textwidth}{Xl}
 \toprule
 \textbf{Invariant} & \textbf{Vérifié par} \\
 \midrule
-Sortie utilise uniquement des tuiles présentes dans l'échantillon & \texttt{test\_solver::output\_uses\_only\_input\_tiles} \\
-\midrule
+Sortie utilise uniquement des tuiles du sample & \texttt{test\_solver} \\
 Symétrie des règles : $t_2 \in \text{allow}(t_1, d) \iff t_1 \in \text{allow}(t_2, -d)$ & \texttt{test\_overlap} \\
-\midrule
-Identité au décalage $(0, 0)$ : $\text{allow}(t, 0, 0) = \{t\}$ & \texttt{test\_overlap} \\
-\midrule
+Identité au décalage $(0,0)$ : $\text{allow}(t, 0, 0) = \{t\}$ & \texttt{test\_overlap} \\
 Total des fréquences = $r_S \cdot c_S$ (toroïdal) & \texttt{test\_tileset} \\
-\midrule
-Déterminisme : même seed → même output (bit-à-bit) & \texttt{test\_solver}, \texttt{test\_solver\_omp}, \texttt{test\_solver\_kokkos} \\
-\midrule
-Bit-identité serial = OMP = Kokkos pour un même seed et $\{1, 2, 4, 8\}$ threads & \texttt{test\_solver\_omp}, \texttt{test\_solver\_kokkos} \\
-\midrule
-Reseed produit une sortie différente (haute probabilité) & \texttt{test\_solver\_omp}, \texttt{test\_solver\_kokkos} \\
+Déterminisme : même seed $\to$ même output (bit-à-bit) & \texttt{test\_solver*} \\
+Bit-identité serial = OMP = Kokkos pour $\{1, 2, 4, 8\}$ threads & \texttt{test\_solver\_*} \\
+Reseed produit une sortie différente (haute probabilité) & \texttt{test\_solver\_*} \\
 \bottomrule
 \end{tabularx}
 \caption{Invariants algorithmiques vérifiés par la suite de tests.}

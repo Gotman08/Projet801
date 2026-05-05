@@ -1,10 +1,6 @@
 \chapter{Conclusion}
 \label{chap:conclusion}
 
-\epigraph{\textit{``Programs must be written for people to read, and only incidentally for machines to execute.''}}{--- Harold Abelson}
-
-Ce chapitre conclut le rapport en dressant le bilan du projet, en synthétisant les apports techniques, et en formulant les leçons retenues.
-
 % =============================================================================
 \section{Bilan technique}
 \label{sec:concl:bilan}
@@ -12,17 +8,15 @@ Ce chapitre conclut le rapport en dressant le bilan du projet, en synthétisant 
 
 \subsection{Trois livrables du sujet, atteints}
 
-Le sujet demandait trois livrables. Nous les avons tous fournis et étendus.
-
 \begin{table}[H]
 \centering
 \begin{tabularx}{\textwidth}{lXl}
 \toprule
 \textbf{Livrable demandé} & \textbf{Notre livraison} & \textbf{Status} \\
 \midrule
-(i) Version série & \texttt{wfc\_serial} avec extraction toroïdale, \texttt{Bitset} packé, BFS classique & OK \\
-(ii) Version parallèle (\texttt{omp task} explicite OU Kokkos) & Les deux : \texttt{wfc\_omp} + \texttt{wfc\_kokkos} & OK + bonus \\
-(iii) Extension multi-valeurs & Type \texttt{uint8\_t} partout, samples terrain/maze/smooth, aucune modif solver & OK \\
+(i) Version série & \texttt{wfc\_serial} : extraction toroïdale, \texttt{Bitset} packé \texttt{u64}, BFS niveau-synchrone & OK \\
+(ii) Version parallèle (\texttt{omp task} ou Kokkos) & Les deux livrés : \texttt{wfc\_omp} + \texttt{wfc\_kokkos} & OK + bonus \\
+(iii) Extension multi-valeurs & Type \texttt{uint8\_t} partout, samples terrain/maze/smooth, aucune modif solveur & OK \\
 \bottomrule
 \end{tabularx}
 \caption{Trois livrables du sujet, tous atteints.}
@@ -32,88 +26,39 @@ Le sujet demandait trois livrables. Nous les avons tous fournis et étendus.
 \subsection{Extensions livrées au-dessus du sujet}
 
 \begin{itemize}
-    \item \textbf{Backend GPU CUDA} via Kokkos refactor (compile et tourne sur GH200, 12/12 tests passent ; perf décevante mais le port est correct).
+    \item \textbf{Backend GPU CUDA} via refactor Kokkos (compile et tourne sur GH200, 12/12 tests passent).
     \item \textbf{Parallel attempts} (\texttt{--parallel-attempts K}) : 2.14× wallclock sur terrain N=3 24×24.
     \item \textbf{Symétries D4} (\texttt{--symmetries S}) : opt-in, hot path inchangé à $S=1$.
-    \item \textbf{Backtracking} (\texttt{--backtrack}) avec snapshot delta-encodé : résout des instances où retry échoue.
+    \item \textbf{Backtracking} (\texttt{--backtrack}) avec snapshot delta-encodé.
     \item \textbf{Démo UE5} (\texttt{-DBUILD\_DUNGEON=ON}) : CLI \texttt{wfc\_dungeon} + plugin Unreal Engine 5.7.
 \end{itemize}
 
 \subsection{Performance principale}
 
-\textbf{Speedup peak 8.23× à 16 threads sur 256×256 binary, Romeo EPYC 9654.}
+\textbf{Speedup peak 8.23× à 16 threads sur 256×256, Romeo EPYC 9654.}
 
 \begin{table}[H]
 \centering
 \begin{tabular}{lrr}
 \toprule
-\textbf{Workload} & \textbf{Peak speedup} & \textbf{Threads peak} \\
+\textbf{Workload} & \textbf{Peak} & \textbf{Threads} \\
 \midrule
 binary\_L11 64×64 & 2.64× & 8 \\
-binary\_L11 128×128 & 5.27× → 6.10× (avec optim) & 8 \\
+binary\_L11 128×128 baseline & 5.27× & 8 \\
+binary\_L11 128×128 + frontier-threshold & 6.10× & 8 \\
 binary\_L11 256×256 & \textbf{8.23×} & 16 \\
 terrain\_L33 128×128 & 5.69× & 8 \\
 \bottomrule
 \end{tabular}
-\caption{Récap des speedup peak Romeo.}
+\caption{Speedup peak Romeo, par workload.}
 \label{tab:concl:peak}
 \end{table}
 
-\subsection{Validation rigoureuse}
+\subsection{Validation}
 
 \begin{itemize}
-    \item \textbf{15 suites de tests}, 24 980 invariants vérifiés.
-    \item \textbf{99\% line coverage} (gcovr 8.6).
-    \item \textbf{Déterminisme bit-à-bit} serial = OMP = Kokkos vérifié pour {1, 2, 4, 8} threads et plusieurs seeds.
-    \item \textbf{220+ runs benchmarkés} sur Romeo (jobs SLURM 543692, 544061, 544356, 544361).
+    \item 15 suites de tests, 24\,980 invariants vérifiés.
+    \item 99\% line coverage (gcovr 8.6).
+    \item Déterminisme bit-à-bit serial = OMP = Kokkos vérifié pour \{1, 2, 4, 8\} threads et plusieurs seeds.
+    \item 220+ runs benchmarkés sur Romeo (jobs SLURM 543692, 544061, 544356, 544361).
 \end{itemize}
-
-% =============================================================================
-\section{Leçons HPC}
-\label{sec:concl:lecons}
-% =============================================================================
-
-\begin{enumerate}
-    \item \textbf{Profiler avant d'optimiser.} La sélection min-entropie domine 8× la propagation BFS, contrairement à notre première intuition. Sans profilage, nous aurions paralléliser le mauvais hot path.
-
-    \item \textbf{Une seule région \texttt{parallel} pour la propagation.} Le pattern naïf (région par niveau BFS) effondre les performances. Il faut comprendre la sémantique \texttt{single}/\texttt{task} pour piloter les niveaux successifs au sein d'une seule région ouverte.
-
-    \item \textbf{A/B testing avec médiane.} Sur 5 optims source-level testées (issues du livre CSAPP), une seule (LTO) a survécu. Le compilateur en \texttt{-O3 -march=native} fait déjà la plupart des optimisations CSAPP de bas niveau ; les ajouter manuellement régresse souvent.
-
-    \item \textbf{Déterminisme et parallélisme} ne sont pas incompatibles, mais imposent une discipline : jitter d'entropie stateless, réduction min-entropie ordonnée, atomics commutatives. Vérification systématique par diff bit-à-bit entre serial et OMP/Kokkos.
-
-    \item \textbf{Le GPU n'est pas une solution magique.} Sur notre workload, GH200 est 8× plus lent que CPU EPYC à 8 threads. Les transferts H↔D dominent, et le data-parallelism par niveau BFS est insuffisant. Pour vraiment exploiter le GPU, il faudrait un re-design algorithmique (batch processing).
-
-    \item \textbf{NUMA matters.} Sur EPYC 9654 avec 8 NUMA nodes, la régression à haut thread count est dominée par la contention atomique inter-NUMA. Le first-touch parallèle (lors de l'init Wave) atténue mais ne résout pas le problème ; le vrai fix demande un partitionnement NUMA-aware (piste future).
-
-    \item \textbf{Opt-in extensions} : ajouter symétries, backtracking, parallel-attempts sans dégrader le chemin par défaut demande une discipline de design (paramètres avec valeurs par défaut, dispatch compile-time / runtime). Vérification empirique : perf sanity check après chaque ajout.
-
-    \item \textbf{Tests d'invariants > tests d'output.} \texttt{output\_uses\_only\_input\_tiles}, \texttt{symétrie des règles}, \texttt{rotated\_90⁴ = identité} sont plus robustes que comparer une sortie attendue figée. Ils survivent aux refactors et détectent les régressions subtiles.
-\end{enumerate}
-
-% =============================================================================
-\section{Apports personnels}
-\label{sec:concl:apports}
-% =============================================================================
-
-Ce projet a permis d'appliquer un vaste éventail de compétences HPC sur un problème concret :
-
-\begin{itemize}
-    \item \textbf{C++17 moderne} : templates, conventions \texttt{noexcept}, RAII, structures alignées en cache.
-    \item \textbf{OpenMP avancé} : \texttt{task} explicite, régions \texttt{parallel} ouvertes, atomics relaxed, anti-faux-partage.
-    \item \textbf{Kokkos} : Views, parallel\_for, branche compile-time pour la portabilité GPU, lifecycle management (\texttt{push\_finalize\_hook}).
-    \item \textbf{Méthodologie HPC} : profilage avant optimisation, A/B testing rigoureux, mesure sur cluster Romeo, fits Amdahl, varying datasets / configurations.
-    \item \textbf{Ingénierie logicielle} : architecture modulaire (libs CMake séparées), Template Method, suite de tests à 99\% de couverture, déterminisme garanti par design.
-    \item \textbf{Outils annexes} : SLURM scripts pour Romeo, pipeline Python d'analyse (matplotlib, scipy curve\_fit), intégration UE5.
-\end{itemize}
-
-% =============================================================================
-\section{Mot final}
-\label{sec:concl:final}
-% =============================================================================
-
-Le \textit{Wave Function Collapse} est un algorithme conceptuellement simple : extraire des tuiles, calculer des compatibilités, choisir l'entropie minimale, propager. Cette simplicité est trompeuse. La paralléliser correctement, garantir le déterminisme à travers backends, atteindre 8.23× de speedup sur 192 cœurs, porter sur GPU, et rester sous 1500 lignes de code C++ a demandé bien plus d'effort que la formulation initiale ne le laissait penser.
-
-Le projet illustre que l'optimisation HPC n'est pas une suite de recettes mécaniques, mais une démarche scientifique : mesurer, formuler des hypothèses, les valider ou les rejeter. Sur ce projet, plusieurs intuitions « évidentes » ont été infirmées (la propagation ne domine pas, le cache thread\_local régresse, le GPU est plus lent que le CPU). Sans la discipline du profilage et du A/B testing, le résultat aurait été bien moins performant.
-
-Au-delà du sujet académique, le code livré est utilisable en production : déterministe, testé, documenté, livré avec une démo UE5. Les extensions (symétries, backtracking, parallel-attempts) sont opt-in et n'imposent rien à qui n'en a pas besoin. C'est la discipline minimale pour qu'un projet HPC reste utilisable dans le temps et par d'autres.

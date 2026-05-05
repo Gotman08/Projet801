@@ -43,17 +43,23 @@ cmake --build build -j
 \subsection{Romeo armgpu (Kokkos+CUDA)}
 
 \begin{verbatim}
-salloc --partition=instant --constraint=armgpu --gpus-per-node=1 \
-    --time=01:00:00 --account=r250127
+salloc --partition=instant --constraint=armgpu \
+    --gpus-per-node=1 --time=01:00:00 --account=r250127
 romeo_load_armgpu_env
-# Kokkos avec backend CUDA
-cmake -S external/kokkos/src -B external/kokkos/build_cuda -G Ninja \
-    -DKokkos_ENABLE_CUDA=ON -DKokkos_ENABLE_SERIAL=ON \
+
+# Build Kokkos avec backend CUDA
+cmake -S external/kokkos/src \
+    -B external/kokkos/build_cuda -G Ninja \
+    -DKokkos_ENABLE_CUDA=ON \
+    -DKokkos_ENABLE_SERIAL=ON \
     -DKokkos_ARCH_HOPPER90=ON \
     -DCMAKE_INSTALL_PREFIX="$PWD/external/kokkos/install_cuda"
-cmake --build external/kokkos/build_cuda -j && cmake --install
-# Project build
-cmake -B build_cuda -G Ninja -DCMAKE_BUILD_TYPE=Release \
+cmake --build external/kokkos/build_cuda -j
+cmake --install external/kokkos/build_cuda
+
+# Build du projet contre Kokkos
+cmake -B build_cuda -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
     -DUSE_OMP=ON -DUSE_KOKKOS=ON -DUSE_LTO=ON \
     -DKokkos_ROOT="$PWD/external/kokkos/install_cuda"
 cmake --build build_cuda -j
@@ -114,16 +120,16 @@ binary_L11,omp,8,samples/binary_5x5.txt,2,128,128,42,0,
 \toprule
 \textbf{Sample} & \textbf{Description} & \textbf{Usage} \\
 \midrule
-\texttt{binary\_5x5.txt} & 5×5 binaire, exemple littéral du sujet & Référence, tests \\
-\texttt{binary\_stripes.txt} & Bandes verticales 0/1 alternées & Cas dégénéré (2 tuiles) \\
-\texttt{binary\_dots.txt} & 1 isolés sur fond 0 & 7 tuiles, varié \\
+\texttt{binary\_5x5.txt} & 5×5 binaire, exemple du sujet & Référence \\
+\texttt{binary\_stripes.txt} & Bandes verticales 0/1 alternées & 2 tuiles, dégénéré \\
+\texttt{binary\_dots.txt} & 1 isolés sur fond 0 & 7 tuiles \\
 \texttt{binary\_checker.txt} & Damier 0/1 & 2 tuiles, dégénéré \\
-\texttt{multivalue\_terrain.txt} & 4 valeurs (eau/sable/herbe/roche), couches concentriques & 33 tuiles à $N=2$, 73 à $N=3$ \\
-\texttt{multivalue\_maze.txt} & 3 valeurs (sol/mur/porte), labyrinthe & 24 tuiles \\
-\texttt{multivalue\_smooth.txt} & 4 valeurs en gradients lisses & 12 tuiles, plateau scaling \\
-\texttt{skyline.txt} & 4 valeurs (sky/wall/window/foundation), 16×14 & Gallery, $N=3$ \\
-\texttt{plant.txt} & 4 valeurs (sky/stem/flower/ground), 16×15 & Gallery, $N=3$ \\
-\texttt{rooms.txt} & Binaire dungeon, pièces rectangulaires, 12×12 & Gallery, $N=3$ \\
+\texttt{multivalue\_terrain.txt} & 4 valeurs, couches concentriques & 33 tuiles ($N=2$) \\
+\texttt{multivalue\_maze.txt} & 3 valeurs, labyrinthe & 24 tuiles \\
+\texttt{multivalue\_smooth.txt} & 4 valeurs, gradients lisses & 12 tuiles, plateau \\
+\texttt{skyline.txt} & 4 valeurs : ciel/mur/fenêtre/sol & Gallery, $N=3$ \\
+\texttt{plant.txt} & 4 valeurs : ciel/tige/fleur/sol & Gallery, $N=3$ \\
+\texttt{rooms.txt} & Dungeon binaire, pièces rectangulaires & Gallery, $N=3$ \\
 \bottomrule
 \end{tabularx}
 \caption{Description des samples livrés.}
@@ -137,34 +143,46 @@ binary_L11,omp,8,samples/binary_5x5.txt,2,128,128,42,0,
 
 \begin{table}[H]
 \centering
-\begin{tabularx}{\textwidth}{lXl}
+\small
+\begin{tabularx}{\textwidth}{Xl}
 \toprule
-\textbf{Optim} & \textbf{Catégorie} & \textbf{Verdict} \\
+\textbf{Optim} & \textbf{Verdict} \\
 \midrule
-\texttt{-O3 -march=native} & compilateur & gardé (baseline) \\
-LTO (\texttt{USE\_LTO=ON}) & compilateur & gardé (+3.4\%) \\
-PGO (Profile-Guided Optim) & compilateur & rejeté (+0.4\% sup., complexité) \\
-Cache \texttt{f * log(f)} thread\_local & source-level CSAPP & rejeté (-6.7\%) \\
-\texttt{std::queue} → vector FIFO & source-level CSAPP & rejeté (-3\%) \\
-Hoist \texttt{wave.at(c)} (CSE manuel) & source-level CSAPP & rejeté (variance) \\
-Frontier-threshold (kSerialFallback) & OMP intra-attempt & gardé (+25\% à 64t) \\
-Relaxed-load avant \texttt{lock and} & OMP atomic & gardé (~50\% trafic) \\
-Single \texttt{parallel} region pour propagation & OMP arch & gardé (essentiel) \\
-Per-thread frontier alignas(64) & OMP anti-faux-partage & gardé \\
-NUMA first-touch parallèle & OMP NUMA & gardé \\
-\texttt{parallel\_min\_entropy} short-circuit & OMP small workloads & gardé \\
-Work-density gate dans \texttt{propagate\_tasks} & OMP workload-aware & rollbacked (risque binary) \\
-\texttt{cell\_jitter} SplitMix64 stateless & déterminisme & gardé \\
-Réduction min-entropie ordonnée & déterminisme & gardé \\
-Kokkos \texttt{kHostOnly} compile-time branch & Kokkos perf-portability & gardé \\
-Stack arrays \texttt{MAX\_WORDS\_PER\_CELL} & Kokkos GPU contraintes & gardé \\
-\texttt{push\_finalize\_hook} pour cleanup & Kokkos lifecycle & gardé \\
-Parallel attempts (\texttt{--parallel-attempts}) & extension algorithmique & gardé (option) \\
-Symétries D4 (\texttt{--symmetries}) & extension tile set & gardé (option) \\
-Backtracking + delta snapshot (\texttt{--backtrack}) & extension récupération & gardé (option) \\
+\multicolumn{2}{l}{\textit{Compilateur}} \\
+\texttt{-O3 -march=native} & gardé (baseline) \\
+LTO (\texttt{USE\_LTO=ON}) & gardé (+3.4\%) \\
+PGO en plus de LTO & rejeté (+0.4\%, complexité) \\
+\midrule
+\multicolumn{2}{l}{\textit{Source-level (CSAPP)}} \\
+Cache \texttt{f*log(f)} thread\_local & rejeté ($-$6.7\%) \\
+\texttt{std::queue} $\to$ vector FIFO & rejeté ($-$3\%) \\
+Hoist \texttt{wave.at(c)} (CSE manuel) & rejeté (variance) \\
+\midrule
+\multicolumn{2}{l}{\textit{OpenMP}} \\
+Single \texttt{parallel} region pour propagation & gardé (essentiel) \\
+Frontier-threshold (\texttt{kSerialFallback}) & gardé (+25\% à 64t) \\
+Relaxed-load avant \texttt{lock and} & gardé ($\sim$50\% trafic) \\
+Per-thread frontier \texttt{alignas(64)} & gardé (anti-faux-partage) \\
+NUMA first-touch parallèle & gardé \\
+\texttt{parallel\_min\_entropy} short-circuit & gardé (small workloads) \\
+Work-density gate dans \texttt{propagate\_tasks} & rollback (risque binary) \\
+\midrule
+\multicolumn{2}{l}{\textit{Déterminisme}} \\
+\texttt{cell\_jitter} SplitMix64 stateless & gardé \\
+Réduction min-entropie ordonnée & gardé \\
+\midrule
+\multicolumn{2}{l}{\textit{Kokkos}} \\
+\texttt{kHostOnly} compile-time branch & gardé (perf-portability) \\
+Stack arrays \texttt{MAX\_WORDS\_PER\_CELL} & gardé (contrainte GPU) \\
+\texttt{push\_finalize\_hook} & gardé (lifecycle) \\
+\midrule
+\multicolumn{2}{l}{\textit{Extensions}} \\
+Parallel attempts (\texttt{--parallel-attempts}) & gardé (option) \\
+Symétries D4 (\texttt{--symmetries}) & gardé (option) \\
+Backtracking + delta snapshot & gardé (option) \\
 \bottomrule
 \end{tabularx}
-\caption{Liste exhaustive des optimisations testées.}
+\caption{Liste exhaustive des optimisations testées, regroupées par catégorie.}
 \label{tab:annexes:optims}
 \end{table}
 
@@ -215,13 +233,18 @@ python3 scripts/plot_results.py results/benchmark.csv
 \begin{verbatim}
 ssh romeo
 cd ~/wfc801
-sbatch scripts/romeo_full_bench.slurm         # 1h, full sweep CPU
-sbatch scripts/romeo_optim_test.slurm         # A/B optim
-sbatch scripts/build_kokkos_gpu_romeo.slurm   # 15 min, build GPU
-sbatch scripts/romeo_gpu_bench.slurm          # 10 min, bench GPU
-sbatch scripts/romeo_parallel_attempts.slurm  # A/B parallel-attempts
+# Full sweep CPU 1h
+sbatch scripts/romeo_full_bench.slurm
+# A/B optim
+sbatch scripts/romeo_optim_test.slurm
+# Build GPU 15 min
+sbatch scripts/build_kokkos_gpu_romeo.slurm
+# Bench GPU 10 min
+sbatch scripts/romeo_gpu_bench.slurm
+# A/B parallel-attempts
+sbatch scripts/romeo_parallel_attempts.slurm
 
-# Récupérer les CSV
+# Recuperer les CSV
 scp romeo:~/wfc801/results/*.csv ./results/
 
 # Pipeline d'analyse

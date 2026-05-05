@@ -1,8 +1,6 @@
 \chapter{Parallélisation OpenMP}
 \label{chap:openmp}
 
-\epigraph{\textit{``Premature optimization is the root of all evil. Yet we should not pass up our opportunities in that critical 3\%.''}}{--- Donald E. Knuth}
-
 Le sujet exige l'utilisation de l'API \texttt{\#pragma omp task} explicite (ou Kokkos). Ce chapitre décrit le backend OpenMP : où le parallélisme est appliqué, comment il préserve le déterminisme, et quelles optimisations ont été testées en A/B et gardées ou rejetées.
 
 \section{Localisation du parallélisme}
@@ -28,11 +26,7 @@ Tirage RNG + reste & $\sim 3\%$ & mt19937\_64 \\
 \label{tab:profiling}
 \end{table}
 
-\begin{important}{Leçon HPC : mesurer avant d'optimiser}
-La sélection min-entropie domine 8× la propagation BFS. Notre première intuition était que la propagation, plus visible algorithmiquement, serait le hot spot. Le profilage l'a infirmée.
-\end{important}
-
-Conséquence : nous parallélisons \textbf{deux étapes}, la sélection et la propagation, mais l'effort principal porte sur la sélection.
+La sélection min-entropie domine 8× la propagation BFS. Conséquence directe : nous parallélisons les deux étapes, mais l'effort principal porte sur la sélection.
 
 % =============================================================================
 \section{Sélection min-entropie : \texttt{parallel\_min\_entropy}}
@@ -209,7 +203,7 @@ bool atomic_and_with(BitsetView dst, ConstBitsetView src) {
 
 \subsection{CAS dedup pour le frontier suivant}
 
-Pour éviter qu'une cellule soit ajoutée plusieurs fois au frontier suivant (visitée par plusieurs threads voisins simultanément), on utilise un drapeau \texttt{in\_queue[cell]} en \texttt{compare\_exchange} :
+Pour éviter qu'une cellule soit ajoutée plusieurs fois au frontier suivant (touchée par plusieurs threads voisins en même temps), on utilise un drapeau \texttt{in\_queue[cell]} et un \texttt{compare\_exchange} :
 
 \begin{lstlisting}[language=C++]
 u8 expected = 0;
@@ -233,25 +227,24 @@ Plusieurs optimisations CSAPP-style ont été essayées et rejetées en A/B test
 
 \begin{table}[H]
 \centering
-\begin{tabular}{lrl}
+\small
+\begin{tabularx}{\textwidth}{Xrl}
 \toprule
 \textbf{Optimisation} & \textbf{Median} & \textbf{Verdict} \\
 \midrule
-Release \texttt{-O3 -march=native} (baseline) & 4.280 s & --- \\
-Release + USE\_LTO=ON & 4.134 s & \textbf{+3.4\%, gardée} \\
-Release + LTO + PGO & 4.143 s & +0.4\% supplémentaire, rejetée (complexité) \\
-Cache \texttt{f * log(f)} thread\_local & 4.749 s & \textbf{-6.7\%, rejetée} \\
-\texttt{std::queue} → vector FIFO & 4.586 s & -3\% (dans le bruit), rejetée \\
-Hoist \texttt{wave.at(c)} (CSE manuel) & 4.342 s & 0\% (variance), rejetée \\
+\texttt{-O3 -march=native} (baseline) & 4.280 s & --- \\
++ \texttt{USE\_LTO=ON} & 4.134 s & \textbf{+3.4\% gardée} \\
++ LTO + PGO & 4.143 s & +0.4\% rejetée \\
+Cache \texttt{f*log(f)} thread\_local & 4.749 s & \textbf{$-$6.7\% rejetée} \\
+\texttt{std::queue} $\to$ vector FIFO & 4.586 s & $-$3\% bruit \\
+Hoist \texttt{wave.at(c)} (CSE) & 4.342 s & 0\% variance \\
 \bottomrule
-\end{tabular}
-\caption{A/B testing des optimisations source-level. Le compilateur en \texttt{-O3 -march=native} fait déjà la plupart des optimisations CSAPP de bas niveau.}
+\end{tabularx}
+\caption{A/B testing source-level. Le compilateur \texttt{-O3 -march=native} fait déjà la plupart des optims CSAPP.}
 \label{tab:omp:rejected}
 \end{table}
 
-\begin{important}{Leçon HPC : ne pas optimiser à l'aveugle ce que le compilateur fait déjà}
-Sur 5 candidats source-level testés (issus du livre CSAPP de Bryant et O'Hallaron), un seul (LTO) a survécu. Les optims qui semblaient « évidentes » (cache thread-local, vector FIFO) ont régressé ou été dans le bruit. Le compilateur en \texttt{-O3 -march=native} les fait déjà, ou les rend obsolètes.
-\end{important}
+Sur les 5 candidats source-level testés (issus de CSAPP), un seul (LTO) a survécu : le compilateur en \texttt{-O3 -march=native} effectue déjà la plupart de ces transformations.
 
 % =============================================================================
 \section{Déterminisme}
@@ -278,7 +271,9 @@ inline double cell_jitter(int cell, u64 seed) {
 
 \subsection{Réduction min-entropie ordonnée}
 
-La réduction finale parcourt les \texttt{partials[]} en ordre de chunk croissant, pas \texttt{reduction(min:...)} OMP qui serait non-déterministe.
+La réduction finale parcourt \texttt{partials[]} en ordre de chunk
+croissant. On évite la clause \texttt{reduction(min:...)} d'OMP qui
+serait non-déterministe (dépendante de l'ordre d'arrivée des threads).
 
 \subsection{Atomics relaxed}
 

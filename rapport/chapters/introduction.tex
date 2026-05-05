@@ -1,7 +1,5 @@
 \chapter{Introduction}
 
-\epigraph{\textit{``The world is built up of patterns, and so is the mind.''}}{--- Maxim Gumin}
-
 \section{Contexte}
 
 La \textbf{génération procédurale} est devenue centrale dans plusieurs domaines : jeux vidéo (Minecraft, No Man's Sky, Townscaper), simulation, graphisme, level design, art génératif. Le défi commun : produire des artefacts variés mais qui suivent une cohérence locale. La grille générée ne doit pas seulement être valide globalement, elle doit \textit{ressembler} localement à un échantillon de référence fourni par le designer.
@@ -14,7 +12,7 @@ Parmi les algorithmes répondant à ce besoin, le \textbf{Wave Function Collapse
 
 \begin{figure}[H]
 \centering
-\schemaImage{Sorties WFC paper-style}
+\includegraphics[width=0.85\linewidth]{results/figures/schemas/wfc_paper_outputs.png}
 \caption{Sorties WFC reproductibles à partir de petits échantillons. Le solveur n'apprend pas une grammaire ni un modèle ; il déduit les contraintes locales par énumération des sous-blocs $N \times N$ de l'échantillon.}
 \label{fig:wfc_paper_outputs}
 \end{figure}
@@ -103,7 +101,7 @@ Ce rapport est structuré en douze chapitres, suivis d'annexes techniques :
 
     \item Le \textbf{Chapitre 11} discute des \textit{limites et perspectives} : NUMA partitioning, batch GPU, priority queue incrémentale, SIMD bitset ;
 
-    \item Le \textbf{Chapitre 12} \textit{conclut} en résumant les apports, les leçons HPC retenues, et les recommandations pour une suite éventuelle.
+    \item Le \textbf{Chapitre 12} dresse le bilan technique du projet (livrables, perf peak, validation).
 \end{itemize}
 
 Les \textbf{Annexes} fournissent les détails techniques : commandes de compilation, format CSV des benchmarks, descriptions des samples, et table des optimisations testées.

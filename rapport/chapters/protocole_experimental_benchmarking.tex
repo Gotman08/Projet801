@@ -1,8 +1,6 @@
 \chapter{Protocole expérimental et benchmarking}
 \label{chap:protocole}
 
-\epigraph{\textit{``In God we trust, all others must bring data.''}}{--- W. Edwards Deming}
-
 Ce chapitre décrit la méthodologie expérimentale : plates-formes de mesure, samples utilisés, métriques calculées, scripts SLURM, et reproductibilité.
 
 \section{Plates-formes}
@@ -69,87 +67,8 @@ export OMP_PLACES=cores
 \label{tab:proto:samples}
 \end{table}
 
-\subsection{Visualisation des samples d'entrée}
-
-Les samples sont des grilles d'entiers de taille modeste rendues
-ci-dessous en images PNG (un pixel par cellule, palette couleur par
-valeur). Le solveur n'a accès qu'à cette grille brute ; la palette
-n'est qu'un aide visuel pour le lecteur.
-
-\begin{figure}[H]
-\centering
-\begin{subfigure}[t]{0.18\linewidth}
-\centering
-\includegraphics[width=\linewidth]{results/figures/results/inputs/binary_5x5_input.png}
-\caption{binary\_5x5}
-\end{subfigure}\hfill
-\begin{subfigure}[t]{0.18\linewidth}
-\centering
-\includegraphics[width=\linewidth]{results/figures/results/inputs/binary_stripes_input.png}
-\caption{stripes}
-\end{subfigure}\hfill
-\begin{subfigure}[t]{0.18\linewidth}
-\centering
-\includegraphics[width=\linewidth]{results/figures/results/inputs/binary_dots_input.png}
-\caption{dots}
-\end{subfigure}\hfill
-\begin{subfigure}[t]{0.18\linewidth}
-\centering
-\includegraphics[width=\linewidth]{results/figures/results/inputs/binary_checker_input.png}
-\caption{checker}
-\end{subfigure}\hfill
-\begin{subfigure}[t]{0.18\linewidth}
-\centering
-\includegraphics[width=\linewidth]{results/figures/results/inputs/rooms_input.png}
-\caption{rooms}
-\end{subfigure}
-
-\caption{Samples binaires utilisés. \texttt{binary\_5x5} est l'exemple
-littéral du sujet ; les autres testent des cas dégénérés (stripes,
-checker) ou esthétiques (dots, rooms).}
-\label{fig:inputs_binary}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\begin{subfigure}[t]{0.31\linewidth}
-\centering
-\includegraphics[width=\linewidth]{results/figures/results/inputs/multivalue_terrain_input.png}
-\caption{terrain (4 valeurs).}
-\end{subfigure}\hfill
-\begin{subfigure}[t]{0.31\linewidth}
-\centering
-\includegraphics[width=\linewidth]{results/figures/results/inputs/multivalue_maze_input.png}
-\caption{maze (3 valeurs).}
-\end{subfigure}\hfill
-\begin{subfigure}[t]{0.31\linewidth}
-\centering
-\includegraphics[width=\linewidth]{results/figures/results/inputs/multivalue_smooth_input.png}
-\caption{smooth (4 valeurs).}
-\end{subfigure}
-
-\caption{Samples multi-valeurs. \texttt{terrain} (eau/sable/herbe/roche),
-\texttt{maze} (sol/mur/porte), \texttt{smooth} (gradients lisses).}
-\label{fig:inputs_multivalue}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\begin{subfigure}[t]{0.31\linewidth}
-\centering
-\includegraphics[width=\linewidth]{results/figures/results/inputs/skyline_input.png}
-\caption{skyline.}
-\end{subfigure}\hfill
-\begin{subfigure}[t]{0.31\linewidth}
-\centering
-\includegraphics[width=\linewidth]{results/figures/results/inputs/plant_input.png}
-\caption{plant.}
-\end{subfigure}
-
-\caption{Samples gallery utilisés au Chapitre~\ref{chap:resultats}
-pour la galerie qualitative.}
-\label{fig:inputs_gallery}
-\end{figure}
+Les rendus PNG des samples sont présentés en regard de leurs sorties
+au Chapitre~\ref{chap:resultats} (Section~\ref{sec:res:gallery}).
 
 \subsection{Workloads agrégés}
 
@@ -227,8 +146,9 @@ Pour les A/B testing fins, on utilise une \textbf{médiane sur 11 runs alternés
 
 Le \texttt{wfc\_benchmark} émet un CSV avec les colonnes :
 \begin{verbatim}
-label, backend, threads, sample, N, rows, cols, seed, repeat,
-success, attempts, collapses, propagations, rules_s, solve_s, total_s
+label, backend, threads, sample, N, rows, cols,
+seed, repeat, success, attempts, collapses,
+propagations, rules_s, solve_s, total_s
 \end{verbatim}
 
 Une ligne par (label, backend, threads, size, seed, repeat). Plusieurs labels peuvent coexister dans un même CSV via \texttt{--no-header} sur les sweeps successifs.
@@ -278,6 +198,6 @@ Les 220+ runs benchmarkés sur Romeo couvrent :
 \texttt{544361} & binary\_gpu, terrain\_gpu & sizes 32-256 ; threads 1, 4, 16 + GPU \\
 \bottomrule
 \end{tabularx}
-\caption{Jobs SLURM utilisés pour le rapport. CSV combiné dans \texttt{results/all\_combined.csv} (398 lignes).}
+\caption{Jobs SLURM utilisés pour le rapport. CSV combiné de 398 lignes.}
 \label{tab:proto:jobs}
 \end{table}

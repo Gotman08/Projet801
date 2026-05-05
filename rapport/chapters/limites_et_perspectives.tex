@@ -1,9 +1,7 @@
 \chapter{Limites et perspectives}
 \label{chap:limites}
 
-\epigraph{\textit{``The best way to predict the future is to invent it.''}}{--- Alan Kay}
-
-Ce chapitre analyse les limites rencontrées lors du développement, les leçons apprises, et les pistes d'amélioration futures. L'évolution itérative du projet illustre que l'optimisation HPC est un processus d'exploration où certaines intuitions se révèlent fructueuses et d'autres contre-productives.
+Ce chapitre liste les limites du solveur livré et les pistes d'amélioration documentées dans \texttt{docs/CHOICES.md}.
 
 % =============================================================================
 \section{Limites du solveur actuel}
@@ -124,17 +122,3 @@ Le sweep principal monte à 256×256. Une exécution à 512×512 a été tentée
 
 Nos mesures sont des médianes de 3 ou 11 runs. Nous ne reportons pas d'intervalle de confiance ou d'écart-type. Pour les A/B critiques (frontier-threshold), une analyse statistique formelle (test de Mann-Whitney) serait plus rigoureuse.
 
-% =============================================================================
-\section{Leçons HPC retenues}
-\label{sec:limites:lecons}
-% =============================================================================
-
-\begin{important}{Les 5 leçons principales}
-\begin{enumerate}
-    \item \textbf{Profiler avant d'optimiser}. Notre première intuition (« la propagation domine ») était fausse. La sélection min-entropie domine 8× la propagation.
-    \item \textbf{Une seule région \texttt{parallel}} pour la propagation. Le coût fork/join × N niveaux BFS est catastrophique sinon.
-    \item \textbf{A/B testing avec médiane}, pas moyenne. Sur 5 optims source-level CSAPP, une seule (LTO) a survécu. Le compilateur en \texttt{-O3 -march=native} fait déjà le travail.
-    \item \textbf{Le GPU n'est pas une solution magique}. Sur ce workload, GH200 est plus lent que CPU EPYC. Le data-parallelism massif requiert un re-design algorithmique (batch).
-    \item \textbf{Déterminisme et parallélisme} ne sont pas incompatibles, mais demandent une discipline : jitter stateless, réduction ordonnée, atomics commutatives. Vérification systématique par diff bit-à-bit.
-\end{enumerate}
-\end{important}
