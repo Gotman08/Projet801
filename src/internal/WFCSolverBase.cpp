@@ -104,7 +104,7 @@ Grid WFCSolverBase::solve_parallel(const TileSet& tiles,
         // Cooperative bail-out: as soon as any attempt succeeds, lower-indexed
         // attempts that are still running stay relevant (we may pick them
         // instead) but higher-indexed attempts that haven't started yet skip
-        // their work — the lowest-indexed success will dominate anyway.
+        // their work, the lowest-indexed success will dominate anyway.
         std::atomic<int> lowest_success{batch_size};
 
         const auto t_solve_start = Clock::now();

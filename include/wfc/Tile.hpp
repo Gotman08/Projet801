@@ -14,7 +14,7 @@ namespace wfc {
 //
 // Kept as a `struct` (POD-like) because Tile is constructed and compared
 // by value in many places (extraction, hashing, output verification).
-// The public `data` member is intentional — callers fill it once during
+// The public `data` member is intentional, callers fill it once during
 // construction; afterwards, it's read via `at()` from the rest of the code.
 struct Tile {
     int N = 0;

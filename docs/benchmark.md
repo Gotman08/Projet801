@@ -1,4 +1,4 @@
-# Benchmark — analyse de scaling
+# Benchmark, analyse de scaling
 
 Mesures sur Romeo (HPC AMD EPYC 9654 192c × 2 sockets, 8 NUMA nodes,
 RHEL 9, gcc 14.2, OpenMP 4.5, Kokkos 4.4.01 backend OpenMP+SERIAL pour
@@ -68,7 +68,7 @@ Findings :
 
 3 répétitions par configuration, médiane reportée.
 
-## Strong scaling — speedup vs serial
+## Strong scaling, speedup vs serial
 
 ### `binary_L11` (sample du sujet, 11 tuiles)
 
@@ -131,7 +131,7 @@ l'efficacité passe sous 50%) varie par taille :
 | smooth_N3 | 64×64 | 4 |
 | smooth_N3 | 128×128 | 8 |
 
-Plus la taille est grande, plus le knee se déplace vers la droite —
+Plus la taille est grande, plus le knee se déplace vers la droite -
 plus de travail à amortir.
 
 ## Throughput (Mcells/s)
@@ -160,7 +160,7 @@ Au-delà de 32 threads la matrice devient orange/rouge.
 
 | Backend | 1t | 2t | 4t | 8t | 16t | 32t | 64t | 96t | 192t |
 |---|---|---|---|---|---|---|---|---|---|
-| serial | 3.967 | — | — | — | — | — | — | — | — |
+| serial | 3.967 | - | - | - | - | - | - | - | - |
 | omp | 3.978 | 2.095 | 1.170 | 0.752 | 1.525 | 4.534 | 13.163 | 16.499 | 35.302 |
 | kokkos | 3.42 (default concurrency, valeurs identiques à tous les threads) |
 
@@ -256,7 +256,7 @@ ou `--parallel-attempts K` côté CLI.
 Quand ça paie : workload où le taux d'échec par attempt est non
 négligeable (terrain N=3, multivalue serré). Chaque attempt étant
 sérialisé, les coûts de barrière BFS, de contention atomique
-inter-NUMA, et de fork/join répété disparaissent — on ne paie qu'une
+inter-NUMA, et de fork/join répété disparaissent, on ne paie qu'une
 synchronisation finale pour collecter le résultat.
 
 Quand ça ne paie pas : workload qui réussit en 1 attempt (binary_5x5,
@@ -278,7 +278,7 @@ pour les mêmes seeds (même `winning_attempt` reporté). Test
 ### Optim "min-entropy work-density gate" (gardée)
 
 `parallel_min_entropy` court-circuite vers `serial_min_entropy` quand
-`total_cells × num_tiles < 50 000` ou `max_threads ≤ 1` — typiquement
+`total_cells × num_tiles < 50 000` ou `max_threads ≤ 1`, typiquement
 sur les grilles 32×32 où le scan parallèle ne paie pas le coût de la
 parallel-region. La granularité des chunks passe aussi de
 `total/(4×threads)` à `total/threads` (1 chunk par thread au lieu de
@@ -329,7 +329,7 @@ Le port GPU de Kokkos est fonctionnel ([CHOICES.md](CHOICES.md) §
 | 32×32 | 0.010 s | 0.082 s | 0.440 s | 0.173 s |
 | 64×64 | 0.166 s | 0.341 s | 2.551 s | 0.855 s |
 | 128×128 | 2.623 s | 1.755 s | 10.255 s | 5.431 s |
-| 256×256 | — | — | — | 52.1 s |
+| 256×256 | - | - | - | 52.1 s |
 
 Le GPU est **plus lent** que le CPU à toutes les tailles testées. À
 128×128, GPU = 5.4 s vs CPU OMP 4t aarch64 = 1.8 s. À 256×256, GPU =

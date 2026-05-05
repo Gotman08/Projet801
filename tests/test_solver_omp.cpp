@@ -89,7 +89,7 @@ Grid solve_with(WFCSolver& s, const TileSet& tiles, const OverlapRules& rules,
 
 int main() {
     // === Determinism: OMP at 1, 2, 4, 8 threads matches serial ===
-    // Both sides MUST succeed before comparing — otherwise two zero-filled
+    // Both sides MUST succeed before comparing, otherwise two zero-filled
     // failure grids would compare equal and the test would silently pass
     // even if both backends were broken.
     {

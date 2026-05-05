@@ -1,4 +1,4 @@
-// Comprehensive tests for the Bitset utility — covers the bit-parallel
+// Comprehensive tests for the Bitset utility, covers the bit-parallel
 // operations used in WFC propagation. Includes single-word, multi-word,
 // and tail-trimming edge cases plus the BitsetView/ConstBitsetView wrappers.
 

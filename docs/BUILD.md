@@ -33,7 +33,7 @@ cmake --build build -j
 
 ## Windows (natif, sans WSL)
 
-Le code utilise des intrinsics GCC (`__atomic_fetch_and`, ...) — MSVC
+Le code utilise des intrinsics GCC (`__atomic_fetch_and`, ...), MSVC
 **ne fonctionnera pas**. Il faut MinGW-w64 ou Clang.
 
 ### MSYS2 + MinGW-w64 UCRT (recommandé)
@@ -89,7 +89,7 @@ cd ~/votre_repo_clone
 
 # Charger l'environnement et la toolchain
 romeo_load_x64cpu_env
-spack load /56vu72q   # cmake@3.31.8 %aocc — hash exact, voir spack find --long cmake
+spack load /56vu72q   # cmake@3.31.8 %aocc, hash exact, voir spack find --long cmake
 spack load /tpamt4u   # ninja@1.12.1 %aocc
 spack load gcc@14.2.0
 
@@ -187,7 +187,7 @@ output 128×128, seed 42, attempts 3, médiane sur 11 runs alternés) :
 
 | Build                | Median   | Speedup vs baseline |
 |----------------------|----------|---------------------|
-| Release sans LTO     | 4.280 s  | —                   |
+| Release sans LTO     | 4.280 s  | - |
 | Release + USE_LTO=ON | 4.134 s  | +3.4%               |
 
 LTO testé aussi avec PGO en plus : +0.4% de gain supplémentaire, pas

@@ -19,13 +19,13 @@ plus lourde, donc plus de surface de profilage.
 
 Trois raisons :
 
-1. **Taille dynamique requise** — `std::bitset<N>` exige `N` en constexpr,
+1. **Taille dynamique requise**, `std::bitset<N>` exige `N` en constexpr,
    incompatible avec un `L` (nombre de tuiles) déterminé à runtime selon
    l'échantillon.
-2. **Vectorisation** — `std::vector<bool>` interdit l'accès direct aux
+2. **Vectorisation**, `std::vector<bool>` interdit l'accès direct aux
    mots sous-jacents. On veut faire des `__builtin_popcountll` et des
    AND/OR 64 bits à la fois. Notre `Bitset` expose `words()` directement.
-3. **Allocation** — `std::vector<bool>` reste un wrapper sur `vector<u8>`,
+3. **Allocation**, `std::vector<bool>` reste un wrapper sur `vector<u8>`,
    pas plus dense. Notre `Bitset` est exactement `⌈L/64⌉` mots de 64 bits.
 
 Pour `L = 11` (l'exemple du sujet), le bitset tient dans un seul mot.
@@ -186,7 +186,7 @@ Toute allocation à l'intérieur est multipliée par autant. Donc :
 - les `OffsetScratch` sont pré-alloués pour `max_threads`
 - le seul allocateur appelé en hot path est `Bitset src_snapshot{wave.at(c)}`
   pour le snapshot anti-race (1 mot pour `L<=64`, négligeable côté CPU
-  sur Linux glibc — sur Windows MSYS, la contention sur le heap lock
+  sur Linux glibc, sur Windows MSYS, la contention sur le heap lock
   global de mingw fait perdre la perf parallèle, c'est documenté dans
   [PERFORMANCE.md](PERFORMANCE.md))
 

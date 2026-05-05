@@ -72,7 +72,7 @@ def main():
     ax_gain.axhline(0, color="black", linewidth=0.5)
     ax_gain.set_xlabel("threads")
     ax_gain.set_ylabel("speedup vs before (%)")
-    ax_gain.set_title("Frontier-threshold optim — gain per thread count")
+    ax_gain.set_title("Frontier-threshold optim, gain per thread count")
     ax_gain.grid(True, axis="y", alpha=0.3)
     for i, g in enumerate(gain):
         ax_gain.text(i, g + (1 if g > 0 else -2),

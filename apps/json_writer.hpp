@@ -31,7 +31,7 @@ namespace wfc::json {
  *
  * Emits to an arbitrary `std::ostream` (a file, `std::cout`, etc.).
  * The `Object` and `Array` RAII helpers below open and close braces /
- * brackets and update the comma flag automatically — callers only need
+ * brackets and update the comma flag automatically, callers only need
  * to invoke `key()` / `value()` between them.
  */
 class Writer {

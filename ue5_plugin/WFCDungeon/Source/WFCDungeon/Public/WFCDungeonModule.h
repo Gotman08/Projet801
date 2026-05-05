@@ -7,7 +7,7 @@
 /**
  * Runtime module of the WFC Dungeon plugin.
  *
- * Empty StartupModule/ShutdownModule for now — all the user-facing
+ * Empty StartupModule/ShutdownModule for now, all the user-facing
  * functionality lives in the Actor and DataAsset classes. Keeping a
  * concrete module class makes it cheap to add log categories or
  * console commands later without breaking existing projects.

@@ -115,7 +115,7 @@ struct RulesView_K {
 // functor is device-callable on CUDA / HIP. Optimisations preserved /
 // added relative to the previous host-only Kokkos version:
 //
-//  1. Stack snapshot of the cell's wave (anti-race) — same idea as the
+//  1. Stack snapshot of the cell's wave (anti-race), same idea as the
 //     OMP backend's `Bitset src_snapshot{wave.at(c)}` but using a fixed
 //     u64 array instead of heap-allocated Bitset. Avoids per-iteration
 //     heap allocation, which is a hard requirement on GPU and a measurable
@@ -153,7 +153,7 @@ struct PropagateOp {
         const std::size_t cell_off = static_cast<std::size_t>(c)
                                    * static_cast<std::size_t>(W);
 
-        // Stack snapshot — see optim (1).
+        // Stack snapshot, see optim (1).
         std::uint64_t snap[MAX_WORDS_PER_CELL];
         for (int w = 0; w < W; ++w) snap[w] = wave.words(cell_off + w);
 
@@ -162,7 +162,7 @@ struct PropagateOp {
                 if (dx == 0 && dy == 0) continue;
                 const int nc = wave.torus_idx(r + dy, col + dx);
 
-                // Stack allowed accumulator — see optim (2).
+                // Stack allowed accumulator, see optim (2).
                 std::uint64_t allowed[MAX_WORDS_PER_CELL];
                 for (int w = 0; w < W; ++w) allowed[w] = 0ULL;
 
@@ -210,7 +210,7 @@ struct PropagateOp {
                 if (changed) {
                     // Re-read all words to check for contradiction. Racy with
                     // concurrent writers but the same race shape as the OMP
-                    // backend's `wave.at(nc).any()` check — eventually
+                    // backend's `wave.at(nc).any()` check, eventually
                     // consistent because contradictions don't go away.
                     bool any_set = false;
                     for (int i = 0; i < W; ++i) {
@@ -462,7 +462,7 @@ MinEntropyResult kokkos_min_entropy(const Wave& wave,
     const std::vector<std::uint32_t>* freq_ptr = &freq;
     MinEntropyResult* partials_data = partials.data();
 
-    // Force this parallel_for onto the host execution space — Wave's data
+    // Force this parallel_for onto the host execution space, Wave's data
     // lives in std::vector and is not addressable from the device. The
     // GPU-portable version of this would mirror the wave to a device
     // view (as in propagate_kokkos) and run the scan on the device, but
@@ -490,7 +490,7 @@ MinEntropyResult kokkos_min_entropy(const Wave& wave,
     return global;
 }
 
-// Per-solver scratch — reallocated per (rows, cols, num_tiles) signature so
+// Per-solver scratch, reallocated per (rows, cols, num_tiles) signature so
 // that consecutive solves of the same shape reuse the buffers.
 struct KokkosScratch {
     int rows = 0, cols = 0, num_tiles = 0, words_per_cell = 0;
@@ -552,7 +552,7 @@ void ensure_scratch(KokkosScratch& s, Wave& wave) {
         s.words_per_cell = W;
     } else if constexpr (kHostOnly) {
         // Same shape as last solve, but the underlying Wave object may
-        // be a fresh instance — re-wrap so we point at the current data.
+        // be a fresh instance, re-wrap so we point at the current data.
         if (s.wave_view.data() != wave.raw_words()) {
             s.wave_view = U64View(wave.raw_words(), total_words);
         }
@@ -575,7 +575,7 @@ bool WFCSolverKokkos::propagate(Wave& wave,
     if (W > static_cast<int>(MAX_WORDS_PER_CELL)) {
         // Tile count exceeds the static bound (>512 tiles). The current
         // refactored Kokkos backend cannot handle this configuration on
-        // GPU — fall back to a host-only implementation. We keep the
+        // GPU, fall back to a host-only implementation. We keep the
         // assertion tight here so the solver fails loudly rather than
         // silently producing wrong answers.
         throw std::runtime_error(
@@ -588,7 +588,7 @@ bool WFCSolverKokkos::propagate(Wave& wave,
     ensure_scratch(s, wave);
 
     // Rebuild the flattened rules every propagate. Suboptimal but
-    // correct — caching by pointer identity is broken when different
+    // correct, caching by pointer identity is broken when different
     // OverlapRules instances happen to reuse the same heap address
     // across solves. TODO: cache by rules content hash if perf matters.
     rules_cache().rebuild(rules);

@@ -1,6 +1,6 @@
 ---
 title: "Wave Function Collapse"
-subtitle: "Projet 801 — implémentation HPC"
+subtitle: "Projet 801, implémentation HPC"
 author: "Nicolas Marano"
 date: "12 mai 2026"
 theme: "Madrid"
@@ -123,7 +123,7 @@ for (int k = 0; k < n_chunks; ++k) {
 
 . . .
 
-**Propagation BFS — une seule région `parallel` ouverte**
+**Propagation BFS, une seule région `parallel` ouverte**
 
 ```cpp
 #pragma omp parallel

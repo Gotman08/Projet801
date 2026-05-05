@@ -91,7 +91,7 @@ Convention des valeurs :
 - `1` = mur
 - `6` = porte
 
-Tu peux créer le tien — le format est juste une grille d'entiers,
+Tu peux créer le tien, le format est juste une grille d'entiers,
 voir `samples/multivalue_maze.txt` pour exemple.
 
 ## 4.2. Lancement du générateur
@@ -141,16 +141,16 @@ dans `TileIdToVariants`. Exemple pour un donjon classique :
 
 | Key (tile_id) | TileName | bIsSolid | bIsDoor | FloorMesh | WallMesh | DoorMesh |
 |---------------|----------|----------|---------|-----------|----------|----------|
-| 0 | floor | ❌ | ❌ | `SM_Floor_Stone` | — | — |
-| 1 | wall | ✅ | ❌ | — | `SM_Wall_Stone` | — |
-| 6 | door | ❌ | ✅ | `SM_Floor_Stone` | — | `SM_Door_Wood` |
+| 0 | floor | ❌ | ❌ | `SM_Floor_Stone` | - | - |
+| 1 | wall | ✅ | ❌ | - | `SM_Wall_Stone` | - |
+| 6 | door | ❌ | ✅ | `SM_Floor_Stone` | - | `SM_Door_Wood` |
 
 **Important** : `bIsSolid` doit être coché sur les tiles qui doivent
 provoquer la pose d'un mur sur leurs voisins walkable. `bIsDoor`
 remplace le mur par une porte.
 
 Si certains de tes assets ont une orientation décalée (export Blender,
-Maya...) — utilise `OffsetRotation` pour corriger sans toucher aux
+Maya...), utilise `OffsetRotation` pour corriger sans toucher aux
 assets eux-mêmes.
 
 ## 5.3. Placement de l'acteur
@@ -191,7 +191,7 @@ contient une valeur que `wfc_dungeon` ne connaît pas
 
 ## 6.2. Donjons multi-pièces avec règles spécifiques
 
-Le solveur respecte tout sample — tu peux dessiner un sample plus
+Le solveur respecte tout sample, tu peux dessiner un sample plus
 sophistiqué (corridors, salles, stairs, ...) du moment qu'il reste
 2D. Plus le sample est riche, plus le donjon généré aura de variété.
 
@@ -213,7 +213,7 @@ moins l'un de ces emplacements.
 
 ## Murs orientés à l'envers
 Tes assets sont exportés avec une convention différente. Édite
-`OffsetRotation` dans le `FTileVariants` du tile concerné — par ex.
+`OffsetRotation` dans le `FTileVariants` du tile concerné, par ex.
 `Yaw=90` pour rotation de 90°. Ré-applique avec `Clear` + `Generate`.
 
 ## Floor mesh à la mauvaise hauteur
@@ -253,4 +253,4 @@ spawn des composants. Va dans `Build → Build Paths` (ou `Ctrl+P`).
   ornementé, ...) pour casser la répétition visuelle.
 - Bake automatique du NavMesh post-`Generate`.
 - Un nouveau `EditorUtilityWidget` pour éviter d'avoir à drag-drop
-  l'acteur — bouton "Generate Dungeon" depuis un panneau custom.
+  l'acteur, bouton "Generate Dungeon" depuis un panneau custom.

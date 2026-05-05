@@ -102,7 +102,7 @@ int main() {
     // === Solver failure path: max_attempts > 1, all fail ===
     // Sweep seeds to find one for which all 3 attempts fail (this exercises
     // the loop that retries with different attempt seeds before giving up).
-    // We must observe at least one all-fail case — that's the entire point
+    // We must observe at least one all-fail case, that's the entire point
     // of the test.
     {
         Grid sample = make_maze_sample();
@@ -220,7 +220,7 @@ int main() {
     //     when the target is a directory. ===
     {
         Grid g(2, 2, 1);
-        // Use the temp dir itself as the "file" path — stb_image_write
+        // Use the temp dir itself as the "file" path, stb_image_write
         // can't fopen a directory in write-binary mode.
         auto base = std::filesystem::temp_directory_path();
         // Make sure we point at a directory path (must exist).

@@ -5,7 +5,7 @@
 # saturates. We sweep K = {1, 4, 8, 16, 32} on a fixed batch of seeds.
 #
 # Output is a small text log (wallclock + winning_attempt for each
-# config), not a CSV — the structure isn't useful for plotting.
+# config), not a CSV, the structure isn't useful for plotting.
 #
 #SBATCH --job-name=wfc-pa
 #SBATCH --account=r250127

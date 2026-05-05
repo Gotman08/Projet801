@@ -16,7 +16,7 @@ option(BUILD_TESTING "Build unit tests" ON)
 
 # Optional UE5-facing dungeon CLI. Off by default so the HPC build pipeline
 # (serial / OMP / Kokkos benchmarks) is unaffected. The dungeon target uses
-# only WFCSolverSerial via the public solver interface — no impact on the
+# only WFCSolverSerial via the public solver interface, no impact on the
 # parallel hot path. See docs/ue5_integration.md.
 option(BUILD_DUNGEON "Build the wfc_dungeon CLI for the UE5 plugin" OFF)
 

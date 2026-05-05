@@ -23,7 +23,7 @@ public:
 
 protected:
     // Select the next cell to collapse. Returns -1 if every cell is already
-    // decided (or has a 0-count, i.e. contradiction — the caller verifies).
+    // decided (or has a 0-count, i.e. contradiction, the caller verifies).
     virtual int pick_cell(const Wave& wave,
                           const TileSet& tiles,
                           std::uint64_t seed) = 0;

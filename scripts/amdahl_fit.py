@@ -3,7 +3,7 @@
 the OMP code is at its theoretical ceiling.
 
 For each (label, size), fit  s(p) = 1 / ((1 - f) + f / p)  to the points
-in the *operational window* — the threads where speedup is monotonically
+in the *operational window*, the threads where speedup is monotonically
 non-decreasing (i.e. up to and including the peak). Beyond the peak,
 hardware overheads (NUMA, cache contention) dominate and the model no
 longer applies.
@@ -122,7 +122,7 @@ def plot_one(label, size, all_points, window, f, r2, peak_threads, out_dir):
     ax.set_yscale("log", base=2)
     ax.set_xlabel("threads")
     ax.set_ylabel("speedup vs serial")
-    ax.set_title(f"Amdahl fit — {label} {size}x{size} (peak at {peak_threads} threads)")
+    ax.set_title(f"Amdahl fit, {label} {size}x{size} (peak at {peak_threads} threads)")
     ax.grid(True, which="both", alpha=0.3)
     ax.legend(loc="upper left")
     fig.tight_layout()
@@ -198,11 +198,11 @@ def main():
     print(f"{'Label':<14} {'Size':>5} {'f':>8} {'R²':>7} "
           f"{'Ceil':>8} {'Peak':>8} {'Ratio':>8}")
     for k, v in fits.items():
-        f_s    = f"{v['f']:.3f}"        if v["f"] is not None else "—"
-        r2_s   = f"{v['r2']:.3f}"       if v["r2"] is not None else "—"
-        ceil_s = f"{v['ceiling']:.1f}×" if v["ceiling"] is not None else "—"
-        peak_s = f"{v['peak_speedup']:.2f}×" if v["peak_speedup"] is not None else "—"
-        rt_s   = f"{v['ratio_to_ceiling']*100:.0f} %" if v["ratio_to_ceiling"] is not None else "—"
+        f_s    = f"{v['f']:.3f}"        if v["f"] is not None else "-"
+        r2_s   = f"{v['r2']:.3f}"       if v["r2"] is not None else "-"
+        ceil_s = f"{v['ceiling']:.1f}×" if v["ceiling"] is not None else "-"
+        peak_s = f"{v['peak_speedup']:.2f}×" if v["peak_speedup"] is not None else "-"
+        rt_s   = f"{v['ratio_to_ceiling']*100:.0f} %" if v["ratio_to_ceiling"] is not None else "-"
         print(f"{v['label']:<14} {v['size']:>5} {f_s:>8} {r2_s:>7} "
               f"{ceil_s:>8} {peak_s:>8} {rt_s:>8}")
 

@@ -121,7 +121,7 @@ def parallel_slowdown(agg):
         print(f"| {label} | {size}x{size} | {t} | {base:.2f} | {v:.2f} | {v/base:.2f}× slower |")
         found = True
     if not found:
-        print("*(none — every parallel config beats serial)*")
+        print("*(none, every parallel config beats serial)*")
     print()
 
 
@@ -139,12 +139,12 @@ def workload_sensitivity(agg):
         for lab in labels:
             base = agg.get((lab, "serial", 1, size))
             if base is None:
-                row.append("—")
+                row.append("-")
                 continue
             ts = sorted({k[2] for k in agg
                          if k[0] == lab and k[1] == "omp" and k[3] == size})
             if not ts:
-                row.append("—")
+                row.append("-")
                 continue
             best = min(agg[(lab, "omp", t, size)] for t in ts
                        if (lab, "omp", t, size) in agg)
@@ -157,7 +157,7 @@ def kokkos_anomaly(agg):
     print("## Kokkos thread sensitivity")
     print()
     print("Kokkos solve times across 'thread' counts. The Kokkos backend")
-    print("doesn't take a threads argument from `wfc_benchmark` — it uses")
+    print("doesn't take a threads argument from `wfc_benchmark`, it uses")
     print("the default Kokkos host execution space concurrency. So all")
     print("'thread' columns should give the same result; if they do, this")
     print("documents that the kokkos sweep is effectively a single-config")
@@ -179,7 +179,7 @@ def kokkos_anomaly(agg):
             row = [f"{size}x{size}"]
             for t in threads:
                 v = agg.get((label, "kokkos", t, size))
-                row.append(f"{v:.2f}" if v is not None else "—")
+                row.append(f"{v:.2f}" if v is not None else "-")
             print("| " + " | ".join(row) + " |")
         print()
 
@@ -190,7 +190,7 @@ def main():
         sys.exit(2)
     rows = load(sys.argv[1])
     agg = aggregate(rows)
-    print(f"# Benchmark insights — {len(rows)} rows from {sys.argv[1]}")
+    print(f"# Benchmark insights, {len(rows)} rows from {sys.argv[1]}")
     print()
     best_thread_table(agg)
     efficiency_knee(agg)

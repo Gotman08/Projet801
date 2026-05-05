@@ -29,7 +29,7 @@ Pour reproduire :
 
 ## Échantillons binaires
 
-### `binary_5x5` — l'exemple du sujet
+### `binary_5x5`, l'exemple du sujet
 
 Sample 5×5 du `README.pdf`. Donne 11 tuiles uniques avec N=2.
 
@@ -40,7 +40,7 @@ Sample 5×5 du `README.pdf`. Donne 11 tuiles uniques avec N=2.
 Le solveur reproduit les motifs locaux du sample (diagonales 0/1, zones
 contiguës de 1, transitions). Pas de contradiction sur 5 attempts.
 
-### `binary_stripes` — pattern très contraint
+### `binary_stripes`, pattern très contraint
 
 Bandes verticales 0/1 alternées. Avec N=2, 2 tuiles uniques.
 
@@ -52,7 +52,7 @@ Le solveur converge vers le même motif (à un décalage de phase près).
 Cas dégénéré utilisé par `test_overlap` pour vérifier l'identité des
 règles.
 
-### `binary_checker` — damier
+### `binary_checker`, damier
 
 Damier 0/1 avec N=2 → 2 tuiles uniques. Comme stripes mais avec
 contraintes croisées.
@@ -61,7 +61,7 @@ contraintes croisées.
 |---|---|
 | ![input](figures/results/inputs/binary_checker_input.png) | ![output](figures/results/binary_checker_48x48_N2_seed2.png) |
 
-### `binary_dots` — points isolés
+### `binary_dots`, points isolés
 
 Sample où des `1` isolés sont entourés de `0`. Plus de tuiles uniques
 (7) → grille plus variée.
@@ -72,7 +72,7 @@ Sample où des `1` isolés sont entourés de `0`. Plus de tuiles uniques
 
 ## Échantillons multi-valeurs
 
-### `multivalue_terrain` — eau / sable / herbe / roche
+### `multivalue_terrain`, eau / sable / herbe / roche
 
 Quatre valeurs (0=eau, 3=sable, 4=herbe, 5=roche) en couches concentriques.
 33 tuiles uniques avec N=2. Sample qui montre que le solveur fonctionne
@@ -87,7 +87,7 @@ grande que dans l'échantillon, et le solveur reproduit uniquement les
 transitions locales (eau→sable→herbe→roche), il ne sait pas qu'il doit
 faire une seule île.
 
-### `multivalue_maze` — labyrinthe avec portes
+### `multivalue_maze`, labyrinthe avec portes
 
 Trois valeurs (0=sol, 1=mur, 6=porte). Sample 11×12 issu du fichier
 `samples/multivalue_maze.txt`. Avec N=3 ce sample est connu pour
@@ -98,7 +98,7 @@ Trois valeurs (0=sol, 1=mur, 6=porte). Sample 11×12 issu du fichier
 |---|---|
 | ![input](figures/results/inputs/multivalue_maze_input.png) | ![output](figures/results/multivalue_maze_48x48_N2_seed13.png) |
 
-### `multivalue_smooth` — transitions douces
+### `multivalue_smooth`, transitions douces
 
 Sample avec gradients lisses entre valeurs.
 
@@ -125,7 +125,7 @@ diff out_serial.txt out_omp.txt   # identique
 ```
 
 C'est garanti par le `cell_jitter` SplitMix64 déterministe et la
-réduction min-entropie en ordre de chunk fixe — voir [CHOICES.md](CHOICES.md).
+réduction min-entropie en ordre de chunk fixe, voir [CHOICES.md](CHOICES.md).
 
 ## Résolution de l'exemple du sujet
 
@@ -142,7 +142,7 @@ Reproduction du diagramme ASCII du sujet (figure 1 du README, page 2) :
 
 Le solveur extrait correctement les 7 tuiles distinctes mentionnées
 (en supplément des 4 tuiles supplémentaires créées par le wrap toroïdal,
-soit 11 au total — voir `test_tileset.cpp` pour la vérification).
+soit 11 au total, voir `test_tileset.cpp` pour la vérification).
 La grille 64×64 ci-dessus en est une instance solvée déterministe.
 
 ## Reproduire toute la galerie

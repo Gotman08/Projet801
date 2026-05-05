@@ -25,7 +25,7 @@ nvidia-smi --query-gpu=name,memory.total --format=csv 2>&1 | head -5
 echo ""
 
 # Use exact spack hashes from `spack find --long`. armgpu env doesn't
-# have gcc 14.2 — only gcc 11.4 (which is what cmake/ninja were built
+# have gcc 14.2, only gcc 11.4 (which is what cmake/ninja were built
 # against) or clang 19.1.
 spack load /phhwuh3   # cmake@3.30.5
 spack load /vabslno   # ninja@1.12.1

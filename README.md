@@ -1,4 +1,4 @@
-# Wave Function Collapse — Projet 801
+# Wave Function Collapse : Projet 801
 
 Implémentation C++17 du *Wave Function Collapse overlapping model* (WFC), avec
 trois backends : série, OpenMP (tâches explicites), Kokkos. Le sujet complet
@@ -6,17 +6,17 @@ est dans [`README.pdf`](README.pdf).
 
 ## Documentation
 
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — modules et leurs dépendances
-- [docs/ALGORITHM.md](docs/ALGORITHM.md) — algorithme WFC tel qu'implémenté
-- [docs/CHOICES.md](docs/CHOICES.md) — décisions techniques et raisons
-- [docs/BUILD.md](docs/BUILD.md) — build sous Linux / Windows / Romeo + Kokkos
-- [docs/TESTING.md](docs/TESTING.md) — couverture des tests
-- [docs/PERFORMANCE.md](docs/PERFORMANCE.md) — analyse perf avec données Romeo
-- [docs/results.md](docs/results.md) — galerie d'images générées
-- [docs/benchmark.md](docs/benchmark.md) — analyse de scaling SLURM
-- [docs/report.md](docs/report.md) — rapport académique
-- [docs/slides.md](docs/slides.md) — slides de présentation
-- [docs/ue5_integration.md](docs/ue5_integration.md) — démo Unreal Engine 5 (optionnelle, voir `BUILD_DUNGEON`)
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) : modules et leurs dépendances
+- [docs/ALGORITHM.md](docs/ALGORITHM.md) : algorithme WFC tel qu'implémenté
+- [docs/CHOICES.md](docs/CHOICES.md) : décisions techniques et raisons
+- [docs/BUILD.md](docs/BUILD.md) : build sous Linux / Windows / Romeo + Kokkos
+- [docs/TESTING.md](docs/TESTING.md) : couverture des tests
+- [docs/PERFORMANCE.md](docs/PERFORMANCE.md) : analyse perf avec données Romeo
+- [docs/results.md](docs/results.md) : galerie d'images générées
+- [docs/benchmark.md](docs/benchmark.md) : analyse de scaling SLURM
+- [docs/report.md](docs/report.md) : rapport académique
+- [docs/slides.md](docs/slides.md) : slides de présentation
+- [docs/ue5_integration.md](docs/ue5_integration.md) : démo Unreal Engine 5 (optionnelle, voir `BUILD_DUNGEON`)
 
 ## Ce que ça fait
 
@@ -25,9 +25,9 @@ leurs règles d'adjacence, puis génère une nouvelle grille (taille libre)
 qui ne contient localement que des tuiles vues dans l'échantillon.
 
 Backends :
-- `wfc_serial` — référence séquentielle
-- `wfc_omp` — parallélisé avec `#pragma omp task` (sélection min-entropie + propagation BFS)
-- `wfc_kokkos` — variante Kokkos (`parallel_for` + atomics) pour comparaison
+- `wfc_serial` : référence séquentielle
+- `wfc_omp` : parallélisé avec `#pragma omp task` (sélection min-entropie + propagation BFS)
+- `wfc_kokkos` : variante Kokkos (`parallel_for` + atomics) pour comparaison
 
 Les trois produisent un output bit-identique pour un même seed.
 
@@ -56,7 +56,7 @@ cmake --build build -j
 
 Cible CMake additionnelle `wfc_dungeon` qui génère un JSON pour un
 plugin UE 5.7 (`ue5_plugin/WFCDungeon/`). Ne touche ni au benchmark ni
-aux solveurs parallèles — utilise uniquement `WFCSolverSerial` via
+aux solveurs parallèles : utilise uniquement `WFCSolverSerial` via
 l'interface publique. Activer avec `-DBUILD_DUNGEON=ON` :
 
 ```bash
@@ -70,6 +70,12 @@ Le pipeline UE5 (asset → JSON → spawn de meshes) est documenté dans
 [docs/ue5_integration.md](docs/ue5_integration.md). Sans
 `-DBUILD_DUNGEON=ON`, la cible n'est pas générée et le build reste
 identique au pipeline HPC.
+
+Aucun impact perf : la cible `wfc_dungeon` n'est pas liée au
+`wfc_benchmark`, aux suites de tests, ni aux solveurs parallèles.
+Vérifié localement (binary 64×64 best-of-3) avec et sans
+`-DBUILD_DUNGEON=ON` : mêmes temps serial / omp1 / omp4 / omp8 dans
+le bruit de mesure.
 
 ## Tests
 
@@ -126,7 +132,7 @@ OMP_NUM_THREADS=8 ./build/wfc_omp samples/binary_5x5.txt --rows 128 --cols 128 \
 `--parallel-attempts` paie sur les workloads serrés où chaque attempt a
 un risque d'échec (ex. terrain N=3) : 2.14× wallclock observé à K=8 vs
 K=1 sur terrain N=3 24×24. Inutile sur les workloads qui réussissent
-toujours du premier coup — K attempts = K× le travail pour le même
+toujours du premier coup : K attempts = K× le travail pour le même
 résultat.
 
 ## Format des échantillons
@@ -207,5 +213,5 @@ third_party/   stb_image_write.h
 
 ## Licence
 
-Projet académique — code original sous MIT, `stb_image_write.h` sous Public
+Projet académique. Code original sous MIT, `stb_image_write.h` sous Public
 Domain (cf. en-tête du fichier).

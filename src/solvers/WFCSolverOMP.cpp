@@ -100,7 +100,7 @@ void process_cell(int c,
 
     scratch.reset_all();
 
-    // Single pass over the snapshot — accumulate all neighbor unions at once.
+    // Single pass over the snapshot, accumulate all neighbor unions at once.
     src_snapshot.for_each_set([&](std::size_t t) {
         for (int dy = -(N - 1); dy <= N - 1; ++dy) {
             for (int dx = -(N - 1); dx <= N - 1; ++dx) {
@@ -150,7 +150,7 @@ bool propagate_tasks(Wave& wave,
 
     // Two pre-allocated frontier buffers; we ping-pong between them
     // across BFS levels. The "next" buffer is filled by concatenating
-    // per-thread append vectors at the end of each level — no atomic
+    // per-thread append vectors at the end of each level, no atomic
     // counter, no lock.
     std::vector<int> buf_a(static_cast<std::size_t>(total));
     std::vector<int> buf_b(static_cast<std::size_t>(total));
@@ -318,7 +318,7 @@ bool propagate_tasks(Wave& wave,
 //
 // Granularity: one chunk per thread (instead of four) gives each thread the
 // largest possible contiguous slice. Min-entropy chunks have equal cost so
-// finer-grained dynamic balancing buys nothing — just task overhead.
+// finer-grained dynamic balancing buys nothing, just task overhead.
 MinEntropyResult parallel_min_entropy(const Wave& wave,
                                       const std::vector<std::uint32_t>& freq,
                                       std::uint64_t seed,

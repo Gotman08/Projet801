@@ -11,18 +11,18 @@
  *
  * The dungeon generator picks one of these four meshes for each cell
  * based on the cell's role in the local neighbourhood:
- *   - `FloorMesh` — placed for any cell whose tile id is in the
+ *   - `FloorMesh`, placed for any cell whose tile id is in the
  *     "walkable" group, regardless of neighbours.
- *   - `WallMesh` — placed at the edge between a walkable cell and a
+ *   - `WallMesh`, placed at the edge between a walkable cell and a
  *     non-walkable neighbour, rotated so the wall faces inward.
- *   - `CornerMesh` (optional) — substituted for a wall when two
+ *   - `CornerMesh` (optional), substituted for a wall when two
  *     orthogonal walls meet on the same cell. If null, the wall mesh
  *     is reused.
- *   - `DoorMesh` — replaces the wall when the neighbour is itself a
+ *   - `DoorMesh`, replaces the wall when the neighbour is itself a
  *     door tile (creating a passage between rooms).
  *
  * Setting `bIsSolid = true` marks this tile as a wall-like obstacle
- * for neighbour computations — it's what triggers wall placement on
+ * for neighbour computations, it's what triggers wall placement on
  * adjacent walkable cells.
  */
 USTRUCT(BlueprintType)

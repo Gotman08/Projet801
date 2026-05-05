@@ -14,7 +14,7 @@ namespace wfc {
 // with their top-left corner at this cell. Storage is one contiguous
 // `uint64_t` buffer for all cells, indexed by row-major cell × words_per_cell.
 // Cell access goes through BitsetView so the hot loops never dereference a
-// std::vector — better cache behaviour than per-cell vectors.
+// std::vector, better cache behaviour than per-cell vectors.
 //
 // NUMA first-touch policy: the buffer is `resize()`d uninitialised, then
 // filled in parallel. With OMP_PROC_BIND=close on a NUMA system, each thread

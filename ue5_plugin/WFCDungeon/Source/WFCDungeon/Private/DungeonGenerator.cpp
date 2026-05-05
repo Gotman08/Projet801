@@ -38,7 +38,7 @@ FString ADungeonGenerator::ResolveJsonPath() const
 		return FString();
 	}
 
-	// 1. As-is — handles absolute paths and paths the user typed
+	// 1. As-is, handles absolute paths and paths the user typed
 	//    relative to the editor's working dir.
 	if (FPaths::FileExists(Raw))
 	{
@@ -101,7 +101,7 @@ void ADungeonGenerator::GenerateFromJson()
 	if (!TileMapping)
 	{
 		UE_LOG(LogWFCDungeonActor, Warning,
-			TEXT("TileMapping is not set on '%s' — assign a UTileMappingDataAsset before generating."),
+			TEXT("TileMapping is not set on '%s', assign a UTileMappingDataAsset before generating."),
 			*GetName());
 		return;
 	}
@@ -133,7 +133,7 @@ void ADungeonGenerator::GenerateFromJson()
 	if (!Root->TryGetObjectField(TEXT("grid"), GridObj) || !GridObj || !(*GridObj))
 	{
 		UE_LOG(LogWFCDungeonActor, Error,
-			TEXT("JSON has no 'grid' object — was it produced by wfc_dungeon?"));
+			TEXT("JSON has no 'grid' object, was it produced by wfc_dungeon?"));
 		return;
 	}
 
@@ -208,7 +208,7 @@ void ADungeonGenerator::SpawnCell(int32 r, int32 c,
 	const FTileVariants* Variant = TileMapping->Find(TileId);
 	if (!Variant)
 	{
-		// Unknown tile id — skip silently. We could log once per id
+		// Unknown tile id, skip silently. We could log once per id
 		// but that gets very chatty on big dungeons.
 		return;
 	}

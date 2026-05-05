@@ -47,7 +47,7 @@ Grid make_multivalue_sample() {
     return s;
 }
 
-// Highly constrained binary stripes — used to verify the solver works on
+// Highly constrained binary stripes, used to verify the solver works on
 // limited tile vocabularies.
 Grid make_stripes_sample() {
     Grid s(4, 4);

@@ -1,4 +1,4 @@
-# WFCDungeon — plugin Unreal Engine 5.7
+# WFCDungeon, plugin Unreal Engine 5.7
 
 Plugin C++ qui matérialise un donjon 2.5D dans UE5 à partir d'un JSON
 produit par le binaire `wfc_dungeon` du dépôt parent.
@@ -36,7 +36,7 @@ produit par le binaire `wfc_dungeon` du dépôt parent.
        -o /tmp/dungeon.json
    ```
 2. Copie `dungeon.json` quelque part d'accessible à UE5
-   (par ex. `MonProjet/Content/WFC/dungeon.json` — UE peut lire le JSON
+   (par ex. `MonProjet/Content/WFC/dungeon.json`, UE peut lire le JSON
    en relatif au répertoire du projet).
 
 3. Dans UE5 :
@@ -80,7 +80,7 @@ de chaque `FTileVariants` pour appliquer une correction systématique.
 | `bIsDoor` | `bool` | tile porte (remplace mur par porte sur les voisins walkable) |
 | `FloorMesh` | `UStaticMesh*` | sol pour les tiles walkable |
 | `WallMesh` | `UStaticMesh*` | mur posé entre walkable et solid |
-| `CornerMesh` | `UStaticMesh*` | (réservé pour v2 — coins de pièce) |
+| `CornerMesh` | `UStaticMesh*` | (réservé pour v2, coins de pièce) |
 | `DoorMesh` | `UStaticMesh*` | porte qui remplace le mur côté door |
 | `OffsetRotation` | `FRotator` | yaw/pitch/roll de correction d'orientation |
 | `ScaleOverride` | `FVector` | scale par variant (asset à mauvaise échelle) |
@@ -89,10 +89,10 @@ de chaque `FTileVariants` pour appliquer une correction systématique.
 
 - Pas de génération multi-étages (tout est sur Z=0).
 - Pas de placement automatique d'enemies, loots ou lights.
-- Pas de NavMesh rebuild — clique `Build → Build Paths` après génération.
+- Pas de NavMesh rebuild, clique `Build → Build Paths` après génération.
 - Les coins de pièce sont actuellement représentés par un `WallMesh`
   rotaté ; un `CornerMesh` dédié sera ajouté dans une future version.
-- Pas d'undo dans l'éditeur — utilise `Clear Generated` puis
+- Pas d'undo dans l'éditeur, utilise `Clear Generated` puis
   `Generate From Json` pour relancer.
 
 ## Compatibilité UE

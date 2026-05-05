@@ -48,7 +48,7 @@ def speedup_table(agg, label):
         return None
 
     out = []
-    out.append(f"### Strong scaling speedup — `{label}`")
+    out.append(f"### Strong scaling speedup, `{label}`")
     out.append("")
     header = ["Size"] + [f"{t}t" for t in threads]
     out.append("| " + " | ".join(header) + " |")
@@ -68,7 +68,7 @@ def speedup_table(agg, label):
                 sp = base / agg[key]
                 row.append(f"{sp:.2f}×")
             else:
-                row.append("—")
+                row.append("-")
         out.append("| " + " | ".join(row) + " |")
     out.append("")
     return "\n".join(out)
@@ -82,7 +82,7 @@ def efficiency_table(agg, label):
         return None
 
     out = []
-    out.append(f"### Parallel efficiency — `{label}`")
+    out.append(f"### Parallel efficiency, `{label}`")
     out.append("")
     out.append("Efficiency = speedup / threads. 100% = ideal scaling.")
     out.append("")
@@ -104,7 +104,7 @@ def efficiency_table(agg, label):
                 eff = (base / agg[key]) / t
                 row.append(f"{eff*100:.0f}%")
             else:
-                row.append("—")
+                row.append("-")
         out.append("| " + " | ".join(row) + " |")
     out.append("")
     return "\n".join(out)
@@ -117,7 +117,7 @@ def backends_table(agg, label, size):
         return None
 
     out = []
-    out.append(f"### Backend solve time (s) — `{label}`, {size}×{size}")
+    out.append(f"### Backend solve time (s), `{label}`, {size}×{size}")
     out.append("")
     header = ["Backend"] + [f"{t}t" for t in threads]
     out.append("| " + " | ".join(header) + " |")
@@ -129,7 +129,7 @@ def backends_table(agg, label, size):
             if key in agg:
                 row.append(f"{agg[key]:.3f}")
             else:
-                row.append("—")
+                row.append("-")
         out.append("| " + " | ".join(row) + " |")
     out.append("")
     return "\n".join(out)
@@ -141,7 +141,7 @@ def peak_table(agg, label):
     if not sizes:
         return None
     out = []
-    out.append(f"### Peak performance — `{label}`")
+    out.append(f"### Peak performance, `{label}`")
     out.append("")
     out.append("| Size | Serial (s) | Best parallel (s) | Best threads | Peak speedup |")
     out.append("|---|---|---|---|---|")

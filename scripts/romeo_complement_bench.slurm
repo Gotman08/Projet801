@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Targeted complement to job 543692:
-#   - serial 256×256 (missing — we only had omp/kokkos)
+#   - serial 256×256 (missing, we only had omp/kokkos)
 #   - sweep 2: terrain_L33 (missed entirely)
 #   - sweep 3: smooth_N3 (missed entirely)
 #

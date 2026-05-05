@@ -204,7 +204,7 @@ Détails :
 - *Cooperative bail-out* : si l'attempt `j` réussit, les attempts
   `k > j` qui n'ont pas encore commencé skipent leur travail (ils
   perdraient face à `j` de toute façon). Les attempts `k < j` qui
-  tournent encore continuent — l'un d'eux pourrait gagner avec un
+  tournent encore continuent, l'un d'eux pourrait gagner avec un
   index plus bas.
 - Déterminisme préservé : même seed → même sortie qu'un retry
   séquentiel. Le succès d'index minimum d'un batch est exactement ce
@@ -214,7 +214,7 @@ Détails :
 Quand l'utiliser : workloads à fort taux d'échec par attempt (ex.
 `terrain_N3` 24×24 ~10% de succès, gain wallclock 2.14× à K=8 sur
 i9-10900K). Inutile sur les workloads qui réussissent du premier
-coup — K attempts en parallèle = K× le travail pour le même
+coup, K attempts en parallèle = K× le travail pour le même
 résultat.
 
 ## Complexité

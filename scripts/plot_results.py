@@ -100,7 +100,7 @@ def plot_speedup(agg, label, out_dir):
     ax.set_yscale("log", base=2)
     ax.set_xlabel("threads")
     ax.set_ylabel("speedup vs serial")
-    ax.set_title(f"WFC parallel speedup — {label}")
+    ax.set_title(f"WFC parallel speedup, {label}")
     ax.grid(True, which="both", alpha=0.3)
     ax.legend()
     fig.tight_layout()
@@ -127,7 +127,7 @@ def plot_efficiency(agg, label, out_dir):
     ax.set_xscale("log", base=2)
     ax.set_xlabel("threads")
     ax.set_ylabel("parallel efficiency")
-    ax.set_title(f"WFC parallel efficiency — {label}")
+    ax.set_title(f"WFC parallel efficiency, {label}")
     ax.grid(True, which="both", alpha=0.3)
     ax.set_ylim(bottom=0)
     ax.legend()
@@ -151,7 +151,7 @@ def plot_heatmap(agg, label, out_dir):
                 matrix[i, j] = entry["median"]
 
     fig, ax = plt.subplots(figsize=(8.5, 5.0))
-    # Solve time spans several orders of magnitude — log color scale.
+    # Solve time spans several orders of magnitude, log color scale.
     from matplotlib.colors import LogNorm
     finite = matrix[np.isfinite(matrix)]
     vmin = max(finite.min(), 1e-4) if finite.size else 1e-4
@@ -164,7 +164,7 @@ def plot_heatmap(agg, label, out_dir):
     ax.set_yticklabels(sizes)
     ax.set_xlabel("threads")
     ax.set_ylabel("output size")
-    ax.set_title(f"WFC solve time (s, median, log scale) — {label}")
+    ax.set_title(f"WFC solve time (s, median, log scale), {label}")
     fig.colorbar(im, ax=ax, label="seconds (log)")
 
     # Annotate each cell with its value for readability.
@@ -212,7 +212,7 @@ def plot_speedup_with_errors(agg, label, out_dir):
     ax.set_yscale("log", base=2)
     ax.set_xlabel("threads")
     ax.set_ylabel("speedup vs serial")
-    ax.set_title(f"WFC speedup with min/max band — {label}")
+    ax.set_title(f"WFC speedup with min/max band, {label}")
     ax.grid(True, which="both", alpha=0.3)
     ax.legend()
     fig.tight_layout()
@@ -244,7 +244,7 @@ def plot_throughput(agg, label, out_dir):
     ax.set_xscale("log", base=2)
     ax.set_xlabel("threads")
     ax.set_ylabel("throughput (Mcells/s)")
-    ax.set_title(f"WFC throughput — {label}")
+    ax.set_title(f"WFC throughput, {label}")
     ax.grid(True, which="both", alpha=0.3)
     ax.legend()
     fig.tight_layout()
@@ -273,7 +273,7 @@ def plot_backends(agg, label, size, out_dir):
     ax.set_yscale("log")
     ax.set_xlabel("threads")
     ax.set_ylabel("solve time (s, log)")
-    ax.set_title(f"Backend comparison — {label}, {size}x{size}")
+    ax.set_title(f"Backend comparison, {label}, {size}x{size}")
     ax.grid(True, which="both", alpha=0.3)
     ax.legend()
     fig.tight_layout()

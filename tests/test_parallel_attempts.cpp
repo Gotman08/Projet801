@@ -6,7 +6,7 @@
 //    where a single attempt usually fails
 //  - validation rejects parallel_attempts < 1
 //
-// Compiled regardless of USE_OMP — the parallel-attempts orchestration falls
+// Compiled regardless of USE_OMP, the parallel-attempts orchestration falls
 // back to a serial loop when OpenMP is unavailable.
 
 #include "test_helpers.hpp"
@@ -39,7 +39,7 @@ Grid make_readme_sample() {
 }
 
 Grid make_terrain_sample() {
-    // 5x5 patch from samples/multivalue_terrain — concentric rings of values
+    // 5x5 patch from samples/multivalue_terrain, concentric rings of values
     // 0..3. With N=3 this produces a tightly-constrained problem: a single
     // attempt usually contradicts on small grids, but parallel attempts hit
     // a successful seed quickly.
@@ -80,7 +80,7 @@ int main() {
 
     // === Serial backend, parallel_attempts=4, easy sample ===
     // The first attempt succeeds on this sample, so parallel_attempts has
-    // no effect on the result — but we confirm the output matches a
+    // no effect on the result, but we confirm the output matches a
     // sequential-retry run with the same seed and that stats.success holds.
     {
         Grid sample = make_readme_sample();

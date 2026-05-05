@@ -19,12 +19,12 @@ Toutes les mesures avec `-O3 -march=native`, `OMP_PROC_BIND=close`,
 A/B testing (médiane de 11 runs alternés) montre que la seule optim qui
 survit la mesure est LTO (Link-Time Optimization). Les optims source
 appliquées manuellement (cache `f * log(f)` thread_local, vector FIFO,
-hoisting de `wave.at(c)`) ont toutes été rejetées — le compilateur en
+hoisting de `wave.at(c)`) ont toutes été rejetées, le compilateur en
 `-O3 -march=native` les fait déjà.
 
 | Variante                              | Median 128×128 | Δ baseline |
 |---------------------------------------|----------------|------------|
-| Release `-O3 -march=native` (baseline) | 4.280 s        | —          |
+| Release `-O3 -march=native` (baseline) | 4.280 s        | - |
 | Release + `USE_LTO=ON`                | 4.134 s        | +3.4%  |
 | Release + LTO + PGO                   | 4.143 s        | +4.3% (mais PGO complique le build pour 0.4% de plus, rejeté) |
 | Cache `f * log(f)` thread_local       | 4.749 s        | -6.7% (régression, rejeté) |
@@ -87,7 +87,7 @@ dépend de leur parallélisation.
 
 Activer LTO : `cmake -B build -DUSE_LTO=ON ...`
 
-## Speedup OMP — sample binaire L=11
+## Speedup OMP, sample binaire L=11
 
 ### Romeo (EPYC 9654)
 

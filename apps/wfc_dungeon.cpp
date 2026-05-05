@@ -4,7 +4,7 @@
  *        structured JSON file describing the synthesised dungeon for
  *        the Unreal Engine plugin to consume.
  *
- * Reuses the existing 2D solver verbatim — the dungeon is "2.5D" in
+ * Reuses the existing 2D solver verbatim, the dungeon is "2.5D" in
  * the sense that UE5 will extrude each cell into a 3D mesh based on
  * the cell's tile id and its four cardinal neighbours.
  */
@@ -173,7 +173,7 @@ Args parse(int argc, char** argv) {
  * @brief Toroidal-clamped neighbour value lookup.
  *
  * Returns the tile id of the cell at `(r, c)`. Out-of-bounds reads
- * return -1, signalling "no neighbour" — the UE5 plugin treats that
+ * return -1, signalling "no neighbour", the UE5 plugin treats that
  * as a free edge (no wall to spawn).
  */
 int neighbour_id(const wfc::Grid& g, int r, int c) {
@@ -215,7 +215,7 @@ std::unordered_set<int> parse_int_set(const std::string& csv) {
  * (top-left scan order), counting how many were reached. If every
  * walkable cell in the grid was reached, the dungeon is connected.
  *
- * Cardinal-neighbours only (no diagonals) — matches the wall placement
+ * Cardinal-neighbours only (no diagonals), matches the wall placement
  * convention of the UE5 plugin: two walkable cells touching only by a
  * corner are NOT considered connected because a player cannot walk
  * through a corner without going around.
@@ -245,7 +245,7 @@ bool is_connected(const wfc::Grid& g,
 
     if (total == 0) {
         if (out_reached) *out_reached = 0;
-        return true; // Trivially connected — no walkable cells.
+        return true; // Trivially connected, no walkable cells.
     }
 
     int reached = 1;
@@ -343,7 +343,7 @@ LevelGrid solve_one_level(int level_idx,
  * Strategy: for each pair `(i, i+1)`, intersect the walkable cells at
  * matching `(r, c)` positions on both floors. If the intersection is
  * empty, no stair is placed (the dungeon will be effectively cut at
- * that boundary — a warning is logged). Otherwise one cell is picked
+ * that boundary, a warning is logged). Otherwise one cell is picked
  * uniformly and overwritten with `stair_id` on both floors.
  *
  * The mutation is intentional: the caller's `LevelGrid::grid` now
@@ -387,7 +387,7 @@ void place_stairs(std::vector<LevelGrid>& levels,
         if (common.empty()) {
             std::cerr << "[stairs] no walkable cell shared by levels "
                       << i << " and " << (i + 1)
-                      << " — floors will be unreachable from each other\n";
+                      << ", floors will be unreachable from each other\n";
             continue;
         }
 
@@ -395,7 +395,7 @@ void place_stairs(std::vector<LevelGrid>& levels,
         const auto [r, c] = common[pick(rng)];
         // Only paint the stair on the LOWER floor of the pair. The
         // upper floor keeps its walkable tile so the player lands on
-        // a normal floor when arriving from below — the stair mesh
+        // a normal floor when arriving from below, the stair mesh
         // itself is responsible for visually spanning the gap.
         a.at(r, c) = static_cast<wfc::Value>(stair_id);
         std::cerr << "[stairs] placed at level " << i << "/" << (i + 1)
@@ -439,7 +439,7 @@ void write_dungeon_json(std::ostream& os,
 
     // Bump the version when we use the multi-floor layout so older
     // UE5 plugin builds (which only know `cells:` at the root) can
-    // detect and reject — or upgrade — instead of silently mis-parsing.
+    // detect and reject, or upgrade, instead of silently mis-parsing.
     const bool multi_floor = levels_data.size() > 1;
     w.key_value("version", multi_floor ? 2 : 1);
 
@@ -514,7 +514,7 @@ void write_dungeon_json(std::ostream& os,
         emit_cells_for(g0);
     } else {
         // Multi-floor layout: `levels: [{ level, connected, cells }, ...]`.
-        // Single Z-stride for now (`floor_height_cm`) — per-level
+        // Single Z-stride for now (`floor_height_cm`), per-level
         // overrides could be added later without breaking this format.
         w.key("levels");
         {
@@ -557,7 +557,7 @@ int main(int argc, char** argv) {
         opt.max_attempts = args.attempts;
 
         std::unordered_set<int> walkable = parse_int_set(args.walkable_ids);
-        // Stair cells are walkable by definition — they exist only to
+        // Stair cells are walkable by definition, they exist only to
         // let the player move between floors. Adding the id here keeps
         // the connectivity check honest after `place_stairs` mutates
         // the grids in place.
@@ -580,7 +580,7 @@ int main(int argc, char** argv) {
         }
 
         // Insert stairs after every floor has been solved so the post
-        // pass can choose any walkable cell — the stairs never appear
+        // pass can choose any walkable cell, the stairs never appear
         // in the WFC alphabet, they are simply painted on top.
         if (n_levels > 1) {
             place_stairs(levels_data, walkable, args.stair_tile_id, args.seed);

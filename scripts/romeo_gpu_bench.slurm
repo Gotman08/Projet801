@@ -33,7 +33,7 @@ echo ""
 
 OUT=results/gpu_bench_${SLURM_JOB_ID}.csv
 BENCH=./build_cuda/wfc_benchmark
-[[ -x "$BENCH" ]] || { echo "ERROR: $BENCH missing — run scripts/build_kokkos_gpu_romeo.slurm first"; exit 1; }
+[[ -x "$BENCH" ]] || { echo "ERROR: $BENCH missing, run scripts/build_kokkos_gpu_romeo.slurm first"; exit 1; }
 
 # Multiple sizes, GPU only (kokkos with CUDA backend means kokkos calls
 # launch CUDA kernels). serial/omp use CPU as before.

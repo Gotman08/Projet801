@@ -2,7 +2,7 @@
 
 // Helpers shared by every WFC backend (serial / OMP / Kokkos). Pulled out
 // here to keep a single source of truth for entropy, sampling, and output
-// reconstruction — the three solvers used to duplicate ~150 lines of these.
+// reconstruction, the three solvers used to duplicate ~150 lines of these.
 
 #include "wfc/Grid.hpp"
 #include "wfc/OverlapRules.hpp"
@@ -18,13 +18,13 @@ namespace wfc {
 
 // Mixers from SplitMix64 (D. Stafford, 2013). Picked because the algorithm
 // has full avalanche (every output bit depends on every input bit), is
-// stateless (no sequence to maintain — perfect for parallel hashing of
+// stateless (no sequence to maintain, perfect for parallel hashing of
 // cell ids), and runs in three multiplications without branches. Used here
 // only to derive a tiny tie-break jitter; the main RNG remains mt19937_64.
 inline constexpr std::uint64_t kSplitMix64Mul1 = 0xFF51AFD7ED558CCDULL;
 inline constexpr std::uint64_t kSplitMix64Mul2 = 0xC4CEB9FE1A85EC53ULL;
 
-// Reciprocal of the golden ratio (Knuth) — a high-quality additive offset
+// Reciprocal of the golden ratio (Knuth), a high-quality additive offset
 // for deriving distinct seeds from a base + step.
 inline constexpr std::uint64_t kGoldenRatio64 = 0x9E3779B97F4A7C15ULL;
 

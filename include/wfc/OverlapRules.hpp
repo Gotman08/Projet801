@@ -21,7 +21,7 @@ namespace wfc {
 //     |   . t1 t1 .            t2 sits at (dx, dy) from t1's origin.
 //     |       t2 t2            For dx=1, dy=1 above, the overlap is
 //     |       t2 t2            the bottom-right cell of t1 (= top-left
-//     v                        of t2) — both must hold the same value.
+//     v                        of t2), both must hold the same value.
 //     dy (row shift)
 //
 // allowed(t, dx, dy) returns the bitset of tile ids that are valid choices

@@ -40,7 +40,7 @@ Les exécutables tirent uniquement les libs dont ils ont besoin. `wfc_serial`
 ne dépend ni d'OpenMP ni de Kokkos ; `wfc_benchmark` les ajoute conditionnellement
 selon `WFC_HAS_OMP` / `WFC_HAS_KOKKOS`.
 
-## Modules — qui possède quoi
+## Modules, qui possède quoi
 
 ### `Grid` ([include/wfc/Grid.hpp](../include/wfc/Grid.hpp))
 La grille d'entrée et de sortie. Stockage `std::vector<std::uint8_t>`
@@ -53,9 +53,9 @@ FNV-1a (pour la déduplication dans `TileSet`).
 
 ### `Bitset` ([include/wfc/Bitset.hpp](../include/wfc/Bitset.hpp))
 Bitset packé sur `std::uint64_t`. Trois classes :
-- `Bitset` — propriétaire (`std::vector<u64>`)
-- `BitsetView` — vue mutable non-propriétaire (utilisée pour les cellules de `Wave`)
-- `ConstBitsetView` — vue lecture-seule
+- `Bitset` : propriétaire (`std::vector<u64>`)
+- `BitsetView` : vue mutable non-propriétaire (utilisée pour les cellules de `Wave`)
+- `ConstBitsetView` : vue lecture-seule
 
 Toutes les opérations vectorielles (`and_with`, `or_with`, `count`,
 `first_set`, `for_each_set`) traitent 64 bits à la fois et utilisent les
@@ -87,7 +87,7 @@ qu'une tranche de ce buffer ; jamais d'allocation par cellule.
 
 Le constructeur fait un *first-touch parallèle* (pragma omp parallel for
 sur l'init) pour que chaque thread mappe les pages physiques sur son
-NUMA node — important sur EPYC avec 8 NUMA nodes.
+NUMA node, important sur EPYC avec 8 NUMA nodes.
 
 ### `WFCSolverBase` ([include/wfc/internal/WFCSolverBase.hpp](../include/wfc/internal/WFCSolverBase.hpp))
 Squelette commun. Boucle `run_attempt` :
@@ -107,7 +107,7 @@ loop:
   (`attempt_seed`). Chemin historique.
 - `parallel_attempts > 1` : `solve_parallel` lance K tentatives WFC
   *indépendantes* en parallèle (chacune sur son propre `Wave`, avec
-  `serial_run_attempt` de SolverCommon — pas le `propagate` du backend,
+  `serial_run_attempt` de SolverCommon, pas le `propagate` du backend,
   pour éviter l'oversubscription). Le succès d'index minimum gagne
   (sortie identique à un retry séquentiel).
 
@@ -117,14 +117,14 @@ orchestration parallel-attempts) est factorisé.
 
 ### `SolverCommon` ([include/wfc/internal/SolverCommon.hpp](../include/wfc/internal/SolverCommon.hpp))
 Helpers purs partagés entre tous les backends :
-- `weighted_entropy(wave, freq)` — entropie de Shannon pondérée
-- `weighted_pick(wave, freq, rng)` — tirage par fréquence (CDF cumulative)
-- `cell_jitter(cell, seed)` — bruit déterministe pour départager les égalités
-- `attempt_seed(base, n)` — dérive le seed de la n-ième tentative
-- `serial_min_entropy(wave, freq, seed)` — scan séquentiel (utilisé par Serial et Kokkos)
-- `serial_propagate(wave, rules, start, &props)` — BFS séquentiel
-- `serial_run_attempt(wave, tiles, rules, seed, rng, stats)` — pick → collapse → propagate sériel complet, utilisé par l'orchestrateur parallel-attempts
-- `build_output(wave, tiles)` — reconstruit la grille finale
+- `weighted_entropy(wave, freq)`, entropie de Shannon pondérée
+- `weighted_pick(wave, freq, rng)`, tirage par fréquence (CDF cumulative)
+- `cell_jitter(cell, seed)`, bruit déterministe pour départager les égalités
+- `attempt_seed(base, n)`, dérive le seed de la n-ième tentative
+- `serial_min_entropy(wave, freq, seed)`, scan séquentiel (utilisé par Serial et Kokkos)
+- `serial_propagate(wave, rules, start, &props)`, BFS séquentiel
+- `serial_run_attempt(wave, tiles, rules, seed, rng, stats)`, pick → collapse → propagate sériel complet, utilisé par l'orchestrateur parallel-attempts
+- `build_output(wave, tiles)`, reconstruit la grille finale
 
 ### `WFCSolverSerial` ([src/solvers/WFCSolverSerial.cpp](../src/solvers/WFCSolverSerial.cpp))
 Référence séquentielle. `pick_cell` = `serial_min_entropy`, propagation
@@ -134,9 +134,9 @@ BFS classique avec `std::queue`. ~75 lignes.
 Backend OpenMP avec `#pragma omp task` explicite (exigé par le sujet).
 Deux étapes parallélisées :
 
-1. **Min-entropie** (`parallel_min_entropy`) — chunked + réduction ordonnée
+1. **Min-entropie** (`parallel_min_entropy`), chunked + réduction ordonnée
    pour rester déterministe.
-2. **Propagation BFS** (`propagate_tasks`) — région `parallel` ouverte UNE
+2. **Propagation BFS** (`propagate_tasks`), région `parallel` ouverte UNE
    FOIS pour toute la propagation ; le `single` pilote les niveaux. Tasks
    par chunk de cellules sur chaque niveau. Atomic word-level
    `__atomic_fetch_and` pour les écritures concurrentes sur la wave.

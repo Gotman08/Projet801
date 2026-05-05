@@ -67,7 +67,7 @@ def amdahl_fraction_from(speedup_p, p):
 def write_md(out, rows, agg):
     print = lambda *a, **kw: out.write(" ".join(str(x) for x in a) + kw.get("end", "\n"))
 
-    print("# WFC benchmark — diagnostic Romeo")
+    print("# WFC benchmark, diagnostic Romeo")
     print()
 
     # --- summary ---
@@ -113,7 +113,7 @@ def write_md(out, rows, agg):
                   f" {cv*100:.1f} % | {v['median']:.3f} |"
                   f" {v['min']:.3f} | {v['max']:.3f} |")
     else:
-        print("Toutes les configs ont CV ≤ 10 % — bonne reproductibilité.")
+        print("Toutes les configs ont CV ≤ 10 %, bonne reproductibilité.")
     print()
 
     # --- per-label analysis ---
@@ -128,7 +128,7 @@ def write_md(out, rows, agg):
         print("### Sweet spot par taille")
         print()
         print("Le \"sweet spot\" est le nombre de threads qui maximise le speedup")
-        print("(t ≥ 2 ; t=1 OMP est exclu — il représente l'overhead de la version")
+        print("(t ≥ 2 ; t=1 OMP est exclu, il représente l'overhead de la version")
         print("parallèle sans bénéfice).")
         print()
         print("| Size | Threads sweet | Speedup | Efficacité | Solve (s) |")
@@ -203,7 +203,7 @@ def write_md(out, rows, agg):
             print()
 
         # Amdahl fit using the best speedup
-        print("### Loi d'Amdahl — fraction parallélisable estimée")
+        print("### Loi d'Amdahl, fraction parallélisable estimée")
         print()
         print("| Size | Speedup max | Threads | Fraction parallélisable estimée |")
         print("|------|-------------|---------|--------------------------------|")
@@ -220,12 +220,12 @@ def write_md(out, rows, agg):
                 if sp > best_sp:
                     best_sp, best_t = sp, t
             f = amdahl_fraction_from(best_sp, best_t) if best_t else None
-            f_str = f"{f*100:.1f} %" if f is not None else "—"
+            f_str = f"{f*100:.1f} %" if f is not None else "-"
             print(f"| {s}×{s} | {best_sp:.2f}× | {best_t} | {f_str} |")
         print()
 
     # --- propagation stats sanity ---
-    print("## Sanity check — propagations / collapses")
+    print("## Sanity check, propagations / collapses")
     print()
     print("Le ratio propagations/collapses indique la \"profondeur\" moyenne du BFS")
     print("après chaque collapse. Il devrait être stable pour une même config")

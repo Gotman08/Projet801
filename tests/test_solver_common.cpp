@@ -62,7 +62,7 @@ int main() {
         std::vector<std::uint32_t> freq = {1, 1, 1, 1, 1, 1, 1, 1};
         double e = weighted_entropy(b, freq);
         // Production code returns the literal 0.0 in this branch, so exact
-        // equality is safe — but use epsilon for symmetry with the rest.
+        // equality is safe, but use epsilon for symmetry with the rest.
         WFC_CHECK(std::abs(e) < 1e-12);
     }
 

@@ -1,5 +1,5 @@
 ---
-title: "Wave Function Collapse — Projet 801"
+title: "Wave Function Collapse, Projet 801"
 subtitle: "Implémentation série, parallèle (OpenMP/Kokkos), multi-valeurs"
 author: "Nicolas Marano"
 date: "Mai 2026"
@@ -19,22 +19,22 @@ collapse » progressivement par propagation de contraintes.
 
 L'algorithme se résume à six étapes :
 
-1. **Extraction des tuiles** — pour chaque position `(r, c)` de `S` (avec
+1. **Extraction des tuiles**, pour chaque position `(r, c)` de `S` (avec
    wrap-around toroïdal), on lit la sous-grille `N × N` qui commence là, et on
    accumule la liste `L` des tuiles uniques avec leurs fréquences.
-2. **Calcul des règles d'adjacence** — pour chaque paire `(t₁, t₂)` et chaque
+2. **Calcul des règles d'adjacence**, pour chaque paire `(t₁, t₂)` et chaque
    offset `(dx, dy) ∈ [-(N-1), N-1]²`, on détermine si `t₂` placée à `(dx, dy)`
    de `t₁` est compatible (les valeurs coïncident sur la zone de
    recouvrement).
-3. **Initialisation de la wave** — chaque cellule de `G` reçoit l'ensemble
+3. **Initialisation de la wave**, chaque cellule de `G` reçoit l'ensemble
    complet `L` de tuiles candidates.
-4. **Sélection** — on choisit la cellule d'**entropie minimale** (ici, entropie
+4. **Sélection**, on choisit la cellule d'**entropie minimale** (ici, entropie
    de Shannon pondérée par les fréquences), puis on tire au hasard une tuile
    parmi ses candidates (probabilité ∝ fréquence).
-5. **Propagation** — la décision restreint les voisins ; on intersecte
+5. **Propagation**, la décision restreint les voisins ; on intersecte
    itérativement leurs ensembles de candidates avec l'union des tuiles
    compatibles, jusqu'à stabilisation.
-6. **Itération** — on boucle en (4) jusqu'à ce que toutes les cellules soient
+6. **Itération**, on boucle en (4) jusqu'à ce que toutes les cellules soient
    décidées (succès) ou qu'une cellule ait un ensemble vide (contradiction →
    on retente avec un autre seed).
 
@@ -47,20 +47,20 @@ backends** (série, OpenMP-tasks, Kokkos) afin de comparer les approches.
 
 ```
 include/wfc/
-  Grid.hpp        — grille rows × cols, valeurs uint8_t
-  Tile.hpp        — pattern N×N hashable (FNV-1a)
-  Bitset.hpp      — bitset packé sur uint64_t, AND/OR vectoriels
-  TileSet.hpp     — extraction des tuiles + fréquences
-  OverlapRules.hpp — table de compatibilité tuile × offset (bitset par règle)
-  Wave.hpp        — superposition par cellule
-  WFCSolver.hpp   — interface (solve + stats)
-  solvers/        — WFCSolverSerial, WFCSolverOMP, WFCSolverKokkos
-  GridIO.hpp      — lecture/écriture txt, PPM, PNG (via stb_image_write)
-src/              — implémentations correspondantes
-apps/             — wfc_serial, wfc_omp, wfc_kokkos, benchmark
-tests/            — test_grid, test_tileset, test_overlap, test_solver
-samples/          — exemples binaires + multi-valeurs
-scripts/          — run_benchmark.sh, plot_results.py, build_kokkos.sh
+  Grid.hpp         : grille rows × cols, valeurs uint8_t
+  Tile.hpp         : pattern N×N hashable (FNV-1a)
+  Bitset.hpp       : bitset packé sur uint64_t, AND/OR vectoriels
+  TileSet.hpp      : extraction des tuiles + fréquences
+  OverlapRules.hpp : table de compatibilité tuile × offset (bitset par règle)
+  Wave.hpp         : superposition par cellule
+  WFCSolver.hpp    : interface (solve + stats)
+  solvers/         : WFCSolverSerial, WFCSolverOMP, WFCSolverKokkos
+  GridIO.hpp       : lecture/écriture txt, PPM, PNG (via stb_image_write)
+src/               : implémentations correspondantes
+apps/              : wfc_serial, wfc_omp, wfc_kokkos, benchmark
+tests/             : test_grid, test_tileset, test_overlap, test_solver
+samples/           : exemples binaires + multi-valeurs
+scripts/           : run_benchmark.sh, plot_results.py, build_kokkos.sh
 ```
 
 Le cœur (`wfc_core`) est indépendant du backend ; chaque solveur parallèle est
@@ -81,7 +81,7 @@ Kokkos.
 - **Règles d'adjacence** : tableau plat de bitsets, indexé par
   `tile_id × (2N-1)² + offset_index(dx, dy)`. Mémoire :
   `L × (2N-1)² × ⌈L/64⌉ × 8 octets`. Pour notre exemple binaire (`L = 11`,
-  `N = 2`), cela tient dans 800 octets — totalement caché en cache L1.
+  `N = 2`), cela tient dans 800 octets, totalement caché en cache L1.
 - **Wave** : `std::vector<Bitset>` de taille `rows × cols`, accès toroïdal.
 
 ## 2.2. Lecture/écriture
@@ -132,7 +132,7 @@ for (int k = 0; k < n_chunks; ++k) {
 ```
 
 Granularité : `~total / (4 × p)` cellules par tâche, ce qui produit `4 × p`
-tâches au total — assez pour le load-balancing dynamique sans inonder le
+tâches au total, assez pour le load-balancing dynamique sans inonder le
 runtime. La réduction finale est faite en ordre de chunk croissant pour rester
 déterministe.
 
@@ -160,7 +160,7 @@ while (!finished) {
 
 Les écritures concurrentes sur la wave utilisent `__atomic_fetch_and` au
 niveau des mots `uint64_t`. L'opération AND étant associative et commutative,
-le résultat final est invariant à l'ordre d'arrivée — seul le drapeau `changed`
+le résultat final est invariant à l'ordre d'arrivée, seul le drapeau `changed`
 peut différer entre threads, mais les doublons dans la frontière suivante sont
 filtrés via un drapeau `in_queue` protégé par `omp_lock_t`.
 
@@ -190,12 +190,12 @@ fonctionne déjà bien.
 Conserver la propriété « même seed → même output » à travers les backends a
 nécessité deux décisions :
 
-1. **Jitter d'entropie déterministe** — au lieu de tirer un bruit aléatoire
+1. **Jitter d'entropie déterministe**, au lieu de tirer un bruit aléatoire
    pour départager les égalités d'entropie (qui consomme l'état du RNG dans un
    ordre dépendant du parcours), nous calculons une fonction de hash sur
    `(cell_id, seed)`. Le résultat est toujours le même quel que soit l'ordre
    d'évaluation parallèle.
-2. **Réduction ordonnée** — la sélection finale des minima locaux se fait en
+2. **Réduction ordonnée**, la sélection finale des minima locaux se fait en
    ordre de chunk fixe, pas en `reduction(min:...)` non-déterministe.
 
 La conséquence pratique est mesurable : `diff` byte-à-byte entre les sorties
@@ -212,11 +212,11 @@ testée par `test_solver` et systématiquement vérifiée pendant le développem
 | `win-i9` | i9-10900K | Windows 11 + MSYS2 MinGW | g++ 16.1 | 5.2 |
 | `romeo` | AMD EPYC 9654 (192c, 8 NUMA) | RHEL 9 | g++ 14.2 | 4.5 |
 
-Les chiffres rapportés ci-dessous proviennent de Romeo — la plateforme
+Les chiffres rapportés ci-dessous proviennent de Romeo, la plateforme
 HPC cible pour ce TP. `docs/benchmark.md` contient l'analyse complète
 (jobs SLURM 543692, 544061, 544356, 544361, ~600 mesures).
 
-## 4.2. Speedup et efficacité — Romeo (binary_5x5, N=2)
+## 4.2. Speedup et efficacité, Romeo (binary_5x5, N=2)
 
 | Taille | 1t | 4t | 8t | 16t | 32t | 64t | 192t |
 |---|---|---|---|---|---|---|---|
@@ -238,7 +238,7 @@ Lecture :
 
 ![Amdahl 256×256](figures/amdahl/amdahl_binary_L11_256.png){ width=70% }
 
-Le fit Amdahl donne `f = 0.944` sur 256×256 — code parallélisable à
+Le fit Amdahl donne `f = 0.944` sur 256×256, code parallélisable à
 ~94%, ceiling théorique 17.8×. Le peak observé à 51% du ceiling reflète
 les coûts non capturés par Amdahl (NUMA, contention, fork/join).
 
@@ -257,7 +257,7 @@ Quatre échantillons benchmarkés (Romeo) :
 binary_L11) : plus de tuiles → plus de bits manipulés par cellule →
 meilleur amortissement de l'overhead OMP.
 
-`smooth_N3` plafonne à 2.23× au peak (4 threads) sur 128×128 — beaucoup
+`smooth_N3` plafonne à 2.23× au peak (4 threads) sur 128×128, beaucoup
 moins parallélisable. Cause : 12 tuiles × 25 offsets = 300 ops par
 cellule, frontières BFS courtes (motifs lisses = peu de propagation).
 La barrière BFS et le fork/join coûtent autant que le travail utile à
@@ -284,7 +284,7 @@ Mesure locale (`win-i9`, terrain N=3 24×24, total wallclock sur 4 seeds) :
 Cette optim paie sur les workloads où chaque attempt a un risque
 d'échec (terrain N=3, cellules tightly constrained). Elle est inutile
 sur les workloads qui réussissent toujours du premier coup
-(binary_5x5, smooth_N3) — les K attempts sont K× le travail pour le
+(binary_5x5, smooth_N3), les K attempts sont K× le travail pour le
 même résultat.
 
 ## 4.5. Choix de la taille de tuile N
@@ -369,13 +369,13 @@ Le projet remplit les trois objectifs du sujet :
    sur EPYC 9654) éliminerait les atomics inter-NUMA qui dominent au-
    delà de 32 threads. Évalué dans CHOICES.md (~500 lignes, risque élevé,
    bénéfice probable +30-50% à 64-192 threads).
-2. **GPU CUDA via Kokkos** : déjà fonctionnel sur GH200 mais lent — les
+2. **GPU CUDA via Kokkos** : déjà fonctionnel sur GH200 mais lent, les
    H↔D copies par propagate dominent. Le port nécessiterait un re-design
    batch (résoudre N petits problèmes en parallèle dans un seul kernel)
    pour amortir les transferts.
 3. **Heuristique d'entropie incrémentale** : maintenir une priority
    queue avec lazy invalidation au lieu de re-scanner toute la wave à
-   chaque collapse — la sélection passerait de 85% à <10% du temps
+   chaque collapse, la sélection passerait de 85% à <10% du temps
    total.
 4. **Symétries** : rotations/reflexions des tuiles (extension classique
    de WFC) au niveau de `TileSet::from_sample`. Multiplie par 8 le
