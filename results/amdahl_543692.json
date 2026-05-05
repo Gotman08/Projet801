@@ -1,0 +1,66 @@
+{
+  "binary_L11/32": {
+    "label": "binary_L11",
+    "size": 32,
+    "f": 0.18413196103170257,
+    "r2": 0.5633882587711256,
+    "ceiling": 1.2256884106706103,
+    "peak_speedup": 1.1593474569107942,
+    "peak_threads": 4,
+    "ratio_to_ceiling": 0.9458745361526923,
+    "window_threads": [
+      1,
+      2,
+      4
+    ]
+  },
+  "binary_L11/64": {
+    "label": "binary_L11",
+    "size": 64,
+    "f": 0.7369466071042322,
+    "r2": 0.9294961727787598,
+    "ceiling": 3.801509606060241,
+    "peak_speedup": 2.636462835743582,
+    "peak_threads": 8,
+    "ratio_to_ceiling": 0.6935304941859466,
+    "window_threads": [
+      1,
+      2,
+      4,
+      8
+    ]
+  },
+  "binary_L11/128": {
+    "label": "binary_L11",
+    "size": 128,
+    "f": 0.927584286889309,
+    "r2": 0.9987647369324748,
+    "ceiling": 13.809157668190759,
+    "peak_speedup": 5.272666857177035,
+    "peak_threads": 8,
+    "ratio_to_ceiling": 0.3818239304575807,
+    "window_threads": [
+      1,
+      2,
+      4,
+      8
+    ]
+  },
+  "binary_L11/256": {
+    "label": "binary_L11",
+    "size": 256,
+    "f": 0.9433724796242244,
+    "r2": 0.9669055773855463,
+    "ceiling": 17.659258137458295,
+    "peak_speedup": 8.20964211426167,
+    "peak_threads": 16,
+    "ratio_to_ceiling": 0.46489167610317783,
+    "window_threads": [
+      1,
+      2,
+      4,
+      8,
+      16
+    ]
+  }
+}

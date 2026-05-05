@@ -220,6 +220,67 @@ def plot_speedup_with_errors(agg, label, out_dir):
     plt.close(fig)
 
 
+def plot_throughput(agg, label, out_dir):
+    """Throughput in Mcells/s vs thread count for each output size.
+
+    A horizontal trend means we are throughput-bound by per-cell work; a
+    rising trend with size hints at amortizing fixed overheads (NUMA
+    barriers, fork/join), the signature of weak-scaling-friendly code.
+    """
+    fig, ax = plt.subplots(figsize=(8.5, 5.5))
+    sizes = sizes_for(agg, label)
+    for size in sizes:
+        ts = threads_for(agg, label, size)
+        if not ts:
+            continue
+        thrs, mcs = [], []
+        for t in ts:
+            entry = agg.get((label, "omp", t, size))
+            if not entry:
+                continue
+            thrs.append(t)
+            mcs.append((size * size) / entry["median"] / 1e6)
+        ax.plot(thrs, mcs, marker="o", label=f"{size}x{size}")
+    ax.set_xscale("log", base=2)
+    ax.set_xlabel("threads")
+    ax.set_ylabel("throughput (Mcells/s)")
+    ax.set_title(f"WFC throughput — {label}")
+    ax.grid(True, which="both", alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(os.path.join(out_dir, f"throughput_{label}.png"), dpi=130)
+    plt.close(fig)
+
+
+def plot_backends(agg, label, size, out_dir):
+    """Side-by-side serial vs omp vs kokkos at a fixed size."""
+    fig, ax = plt.subplots(figsize=(8.5, 5.5))
+    backends = sorted({k[1] for k in agg if k[0] == label and k[3] == size})
+    for backend in backends:
+        ts = sorted({k[2] for k in agg
+                     if k[0] == label and k[1] == backend and k[3] == size})
+        if not ts:
+            continue
+        med = [agg[(label, backend, t, size)]["median"] for t in ts
+               if (label, backend, t, size) in agg]
+        thrs = [t for t in ts if (label, backend, t, size) in agg]
+        if backend == "serial" and med:
+            ax.axhline(med[0], color="black", linestyle="-.",
+                       label=f"serial ({med[0]:.2f}s)")
+        else:
+            ax.plot(thrs, med, marker="o", label=backend)
+    ax.set_xscale("log", base=2)
+    ax.set_yscale("log")
+    ax.set_xlabel("threads")
+    ax.set_ylabel("solve time (s, log)")
+    ax.set_title(f"Backend comparison — {label}, {size}x{size}")
+    ax.grid(True, which="both", alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(os.path.join(out_dir, f"backends_{label}_{size}.png"), dpi=130)
+    plt.close(fig)
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("csv")
@@ -238,6 +299,9 @@ def main():
         plot_efficiency(agg, label, args.out)
         plot_heatmap(agg, label, args.out)
         plot_speedup_with_errors(agg, label, args.out)
+        plot_throughput(agg, label, args.out)
+        for size in sizes_for(agg, label):
+            plot_backends(agg, label, size, args.out)
 
     print(f"figures written to {args.out}/")
 

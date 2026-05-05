@@ -31,17 +31,17 @@ class OverlapRules {
 public:
     static OverlapRules build(const TileSet& tiles);
 
-    int N() const { return N_; }
-    int num_tiles() const { return num_tiles_; }
-    int offsets() const { return offsets_; }
-    int stride() const { return stride_; } // 2N - 1
+    int N() const noexcept { return N_; }
+    int num_tiles() const noexcept { return num_tiles_; }
+    int offsets() const noexcept { return offsets_; }
+    int stride() const noexcept { return stride_; } // 2N - 1
 
     // Look up the compatibility bitset for tile `t` at offset (dx, dy).
-    const Bitset& allowed(int t, int dx, int dy) const {
+    const Bitset& allowed(int t, int dx, int dy) const noexcept {
         return rules_[t * offsets_ + offset_index(dx, dy)];
     }
 
-    int offset_index(int dx, int dy) const {
+    int offset_index(int dx, int dy) const noexcept {
         return (dx + N_ - 1) * stride_ + (dy + N_ - 1);
     }
 

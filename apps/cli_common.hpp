@@ -25,6 +25,7 @@ struct Args {
     std::string out_txt;
     std::string out_ppm;
     std::string out_png;
+    bool help_only = false;  // set by parse() if --help was passed
 };
 
 inline void print_usage(const char* prog) {
@@ -45,6 +46,15 @@ inline void print_usage(const char* prog) {
 inline Args parse(int argc, char** argv) {
     Args a;
     int i = 1;
+    // Allow --help / -h as the very first arg, with no sample path.
+    if (i < argc) {
+        const std::string first = argv[i];
+        if (first == "-h" || first == "--help") {
+            print_usage(argv[0]);
+            a.help_only = true;
+            return a;
+        }
+    }
     if (i >= argc) { print_usage(argv[0]); throw std::runtime_error("missing sample path"); }
     a.sample = argv[i++];
     while (i < argc) {
@@ -63,13 +73,14 @@ inline Args parse(int argc, char** argv) {
         else if (k == "--out")      a.out_txt  = next("--out");
         else if (k == "--ppm")      a.out_ppm  = next("--ppm");
         else if (k == "--png")      a.out_png  = next("--png");
-        else if (k == "-h" || k == "--help") { print_usage(argv[0]); std::exit(0); }
+        else if (k == "-h" || k == "--help") { print_usage(argv[0]); a.help_only = true; return a; }
         else { print_usage(argv[0]); throw std::runtime_error("unknown option: " + k); }
     }
     return a;
 }
 
 inline void run(WFCSolver& solver, const Args& a) {
+    if (a.help_only) return;  // --help was handled by parse(), nothing to run
     Grid sample = read_grid_txt(a.sample);
     auto t0 = std::chrono::steady_clock::now();
     TileSet tiles = TileSet::from_sample(sample, a.N);

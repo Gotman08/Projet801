@@ -15,15 +15,15 @@ public:
     // Sampling is toroidal (wraps around), so each pixel appears in N*N tiles.
     static TileSet from_sample(const Grid& sample, int N);
 
-    int N() const { return N_; }
-    int size() const { return static_cast<int>(tiles_.size()); }
-    const Tile& tile(int id) const { return tiles_[id]; }
-    std::uint32_t frequency(int id) const { return freq_[id]; }
-    const std::vector<Tile>& tiles() const { return tiles_; }
-    const std::vector<std::uint32_t>& frequencies() const { return freq_; }
+    int N() const noexcept { return N_; }
+    int size() const noexcept { return static_cast<int>(tiles_.size()); }
+    const Tile& tile(int id) const noexcept { return tiles_[id]; }
+    std::uint32_t frequency(int id) const noexcept { return freq_[id]; }
+    const std::vector<Tile>& tiles() const noexcept { return tiles_; }
+    const std::vector<std::uint32_t>& frequencies() const noexcept { return freq_; }
 
     // Highest distinct value across all tiles (e.g., 1 for binary, K-1 otherwise).
-    Value max_value() const { return max_value_; }
+    Value max_value() const noexcept { return max_value_; }
 
 private:
     int N_ = 0;

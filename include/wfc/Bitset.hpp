@@ -52,28 +52,28 @@ public:
     ConstBitsetView(const std::uint64_t* words, std::size_t nbits)
         : words_(words), nbits_(nbits) {}
 
-    std::size_t size() const { return nbits_; }
-    std::size_t word_count() const { return detail::words_for(nbits_); }
-    const std::uint64_t* words() const { return words_; }
+    std::size_t size() const noexcept { return nbits_; }
+    std::size_t word_count() const noexcept { return detail::words_for(nbits_); }
+    const std::uint64_t* words() const noexcept { return words_; }
 
-    bool test(std::size_t i) const {
+    bool test(std::size_t i) const noexcept {
         return (words_[i >> 6] >> (i & 63)) & 1ULL;
     }
 
-    std::size_t count() const {
+    std::size_t count() const noexcept {
         std::size_t c = 0;
         const std::size_t n = word_count();
         for (std::size_t i = 0; i < n; ++i) c += detail::popcount64(words_[i]);
         return c;
     }
 
-    bool any() const {
+    bool any() const noexcept {
         const std::size_t n = word_count();
         for (std::size_t i = 0; i < n; ++i) if (words_[i]) return true;
         return false;
     }
 
-    std::size_t first_set() const {
+    std::size_t first_set() const noexcept {
         const std::size_t n = word_count();
         for (std::size_t i = 0; i < n; ++i)
             if (words_[i]) return i * 64 + detail::ctz64(words_[i]);
@@ -109,20 +109,20 @@ public:
 
     operator ConstBitsetView() const { return {words_, nbits_}; }
 
-    std::size_t size() const { return nbits_; }
-    std::size_t word_count() const { return detail::words_for(nbits_); }
-    const std::uint64_t* words() const { return words_; }
-    std::uint64_t* words() { return words_; }
+    std::size_t size() const noexcept { return nbits_; }
+    std::size_t word_count() const noexcept { return detail::words_for(nbits_); }
+    const std::uint64_t* words() const noexcept { return words_; }
+    std::uint64_t* words() noexcept { return words_; }
 
-    bool test(std::size_t i) const {
+    bool test(std::size_t i) const noexcept {
         return (words_[i >> 6] >> (i & 63)) & 1ULL;
     }
-    void set(std::size_t i)   { words_[i >> 6] |=  (1ULL << (i & 63)); }
-    void clear(std::size_t i) { words_[i >> 6] &= ~(1ULL << (i & 63)); }
+    void set(std::size_t i) noexcept   { words_[i >> 6] |=  (1ULL << (i & 63)); }
+    void clear(std::size_t i) noexcept { words_[i >> 6] &= ~(1ULL << (i & 63)); }
 
-    std::size_t count() const { return ConstBitsetView(*this).count(); }
-    bool any() const          { return ConstBitsetView(*this).any(); }
-    std::size_t first_set() const { return ConstBitsetView(*this).first_set(); }
+    std::size_t count() const noexcept { return ConstBitsetView(*this).count(); }
+    bool any() const noexcept          { return ConstBitsetView(*this).any(); }
+    std::size_t first_set() const noexcept { return ConstBitsetView(*this).first_set(); }
 
     template <typename F>
     void for_each_set(F&& f) const {
@@ -175,7 +175,7 @@ public:
         : nbits_(nbits), words_(detail::words_for(nbits), 0ULL) {}
 
     // Copy construction from any view: useful for snapshots.
-    Bitset(ConstBitsetView v)
+    explicit Bitset(ConstBitsetView v)
         : nbits_(v.size()), words_(v.words(), v.words() + v.word_count()) {}
 
     static Bitset full(std::size_t nbits) {

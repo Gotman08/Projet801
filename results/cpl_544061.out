@@ -1,0 +1,17 @@
+Loading x86_64 (no gpu) environment
+Environment loaded. Spack available.
+=== node info ===
+romeo-c031
+Tue May  5 14:04:20 CEST 2026
+Slurm job 544061 on romeo-c031
+192
+
+=== sweep 1b: serial 256x256 (complement to 543692) ===
+
+=== sweep 2: multivalue terrain L=33, N=2 ===
+
+=== sweep 3: multivalue smooth, N=3 ===
+
+=== done ===
+Tue May  5 14:10:55 CEST 2026
+148 results/cpl_544061.csv

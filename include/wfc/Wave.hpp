@@ -51,31 +51,40 @@ public:
         }
     }
 
-    int rows() const { return rows_; }
-    int cols() const { return cols_; }
-    int num_cells() const { return rows_ * cols_; }
-    int num_tiles() const { return num_tiles_; }
+    int rows() const noexcept { return rows_; }
+    int cols() const noexcept { return cols_; }
+    int num_cells() const noexcept { return rows_ * cols_; }
+    int num_tiles() const noexcept { return num_tiles_; }
 
-    BitsetView at(int r, int c) {
+    // Direct access to the flat underlying buffer. Used by GPU-portable
+    // backends (Kokkos) that need to wrap or deep-copy the storage into a
+    // device-accessible View. Layout is row-major: offset of cell (r, c)
+    // is (r * cols + c) * words_per_cell.
+    std::size_t words_per_cell() const noexcept { return words_per_cell_; }
+    std::size_t total_words() const noexcept { return words_.size(); }
+    std::uint64_t* raw_words() noexcept { return words_.data(); }
+    const std::uint64_t* raw_words() const noexcept { return words_.data(); }
+
+    BitsetView at(int r, int c) noexcept {
         return {cell_words(idx(r, c)), static_cast<std::size_t>(num_tiles_)};
     }
-    ConstBitsetView at(int r, int c) const {
+    ConstBitsetView at(int r, int c) const noexcept {
         return {cell_words(idx(r, c)), static_cast<std::size_t>(num_tiles_)};
     }
-    BitsetView at(int cell) {
+    BitsetView at(int cell) noexcept {
         return {cell_words(cell), static_cast<std::size_t>(num_tiles_)};
     }
-    ConstBitsetView at(int cell) const {
+    ConstBitsetView at(int cell) const noexcept {
         return {cell_words(cell), static_cast<std::size_t>(num_tiles_)};
     }
 
-    int row(int cell) const { return cell / cols_; }
-    int col(int cell) const { return cell % cols_; }
+    int row(int cell) const noexcept { return cell / cols_; }
+    int col(int cell) const noexcept { return cell % cols_; }
 
     // Toroidal cell index. Branch-only correction (no modulo): callers in
     // WFC pass offsets bounded by ±(N-1), which is always smaller than
     // rows_/cols_ in any practical configuration.
-    int torus_idx(int r, int c) const {
+    int torus_idx(int r, int c) const noexcept {
         if (r < 0)        r += rows_;
         else if (r >= rows_) r -= rows_;
         if (c < 0)        c += cols_;
@@ -84,12 +93,12 @@ public:
     }
 
 private:
-    int idx(int r, int c) const { return r * cols_ + c; }
+    int idx(int r, int c) const noexcept { return r * cols_ + c; }
 
-    std::uint64_t* cell_words(int cell) {
+    std::uint64_t* cell_words(int cell) noexcept {
         return words_.data() + static_cast<std::size_t>(cell) * words_per_cell_;
     }
-    const std::uint64_t* cell_words(int cell) const {
+    const std::uint64_t* cell_words(int cell) const noexcept {
         return words_.data() + static_cast<std::size_t>(cell) * words_per_cell_;
     }
 

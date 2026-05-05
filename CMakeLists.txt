@@ -14,9 +14,26 @@ option(USE_OMP "Build the OpenMP-parallel solver" ON)
 option(USE_KOKKOS "Build the Kokkos-parallel solver" OFF)
 option(BUILD_TESTING "Build unit tests" ON)
 
+# Link-Time Optimization. Verified +3.9% speedup vs no-LTO on the binary
+# 128x128 N=2 workload (median of 11 alternating runs). Doubles link time
+# from ~1s to ~3s. Off by default to keep the dev edit-build-test loop
+# fast; enable for release builds. Disabled with sanitizers (incompatible).
+option(USE_LTO "Enable Link-Time Optimization (Release only)" OFF)
+
 # Sanitizer options. Mutually exclusive (TSAN does not coexist with ASAN).
 option(USE_TSAN "Build with ThreadSanitizer (race detection)" OFF)
 option(USE_ASAN "Build with AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
+
+if(USE_LTO AND NOT (USE_TSAN OR USE_ASAN))
+  include(CheckIPOSupported)
+  check_ipo_supported(RESULT ipo_ok OUTPUT ipo_msg)
+  if(ipo_ok)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+    message(STATUS "Link-Time Optimization: ON")
+  else()
+    message(WARNING "USE_LTO=ON but compiler does not support IPO: ${ipo_msg}")
+  endif()
+endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -99,13 +116,17 @@ endif()
 
 if(BUILD_TESTING)
   enable_testing()
-  add_executable(test_bitset   tests/test_bitset.cpp)
-  add_executable(test_grid     tests/test_grid.cpp)
-  add_executable(test_grid_io  tests/test_grid_io.cpp)
-  add_executable(test_tileset  tests/test_tileset.cpp)
-  add_executable(test_overlap  tests/test_overlap.cpp)
-  add_executable(test_solver   tests/test_solver.cpp)
-  foreach(t test_bitset test_grid test_grid_io test_tileset test_overlap test_solver)
+  add_executable(test_bitset        tests/test_bitset.cpp)
+  add_executable(test_grid          tests/test_grid.cpp)
+  add_executable(test_grid_io       tests/test_grid_io.cpp)
+  add_executable(test_tileset       tests/test_tileset.cpp)
+  add_executable(test_overlap       tests/test_overlap.cpp)
+  add_executable(test_wave          tests/test_wave.cpp)
+  add_executable(test_solver_common tests/test_solver_common.cpp)
+  add_executable(test_solver        tests/test_solver.cpp)
+  add_executable(test_edge_cases    tests/test_edge_cases.cpp)
+  foreach(t test_bitset test_grid test_grid_io test_tileset test_overlap
+            test_wave test_solver_common test_solver test_edge_cases)
     target_link_libraries(${t} PRIVATE wfc_core)
     add_test(NAME ${t} COMMAND ${t})
   endforeach()
@@ -120,5 +141,9 @@ if(BUILD_TESTING)
     add_executable(test_solver_kokkos tests/test_solver_kokkos.cpp)
     target_link_libraries(test_solver_kokkos PRIVATE wfc_kokkos_lib)
     add_test(NAME test_solver_kokkos COMMAND test_solver_kokkos)
+
+    add_executable(test_kokkos_autoinit tests/test_kokkos_autoinit.cpp)
+    target_link_libraries(test_kokkos_autoinit PRIVATE wfc_kokkos_lib)
+    add_test(NAME test_kokkos_autoinit COMMAND test_kokkos_autoinit)
   endif()
 endif()

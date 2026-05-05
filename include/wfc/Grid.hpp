@@ -15,21 +15,21 @@ public:
     Grid(int rows, int cols, Value fill = 0)
         : rows_(rows), cols_(cols), data_(static_cast<std::size_t>(rows) * cols, fill) {}
 
-    int rows() const { return rows_; }
-    int cols() const { return cols_; }
-    std::size_t size() const { return data_.size(); }
+    int rows() const noexcept { return rows_; }
+    int cols() const noexcept { return cols_; }
+    std::size_t size() const noexcept { return data_.size(); }
 
-    Value& at(int r, int c) {
+    Value& at(int r, int c) noexcept {
         assert(r >= 0 && r < rows_ && c >= 0 && c < cols_);
         return data_[static_cast<std::size_t>(r) * cols_ + c];
     }
-    Value at(int r, int c) const {
+    Value at(int r, int c) const noexcept {
         assert(r >= 0 && r < rows_ && c >= 0 && c < cols_);
         return data_[static_cast<std::size_t>(r) * cols_ + c];
     }
 
     // Toroidal access: wraps around the borders.
-    Value at_torus(int r, int c) const {
+    Value at_torus(int r, int c) const noexcept {
         int rr = ((r % rows_) + rows_) % rows_;
         int cc = ((c % cols_) + cols_) % cols_;
         return data_[static_cast<std::size_t>(rr) * cols_ + cc];
@@ -37,7 +37,7 @@ public:
 
     // Read-only view of the row-major buffer. Mutation goes through `at()`
     // so the rows_/cols_ invariant cannot be broken from outside.
-    const std::vector<Value>& data() const { return data_; }
+    const std::vector<Value>& data() const noexcept { return data_; }
 
     // Fill the grid from a row-major buffer of `rows() * cols()` ints.
     // Throws std::invalid_argument on size mismatch or out-of-range value.

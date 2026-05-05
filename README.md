@@ -4,34 +4,49 @@ Implémentation C++17 du *Wave Function Collapse overlapping model* (WFC), avec
 trois backends : série, OpenMP (tâches explicites), Kokkos. Le sujet complet
 est dans [`README.pdf`](README.pdf).
 
+## Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — modules et leurs dépendances
+- [docs/ALGORITHM.md](docs/ALGORITHM.md) — algorithme WFC tel qu'implémenté
+- [docs/CHOICES.md](docs/CHOICES.md) — décisions techniques et raisons
+- [docs/BUILD.md](docs/BUILD.md) — build sous Linux / Windows / Romeo + Kokkos
+- [docs/TESTING.md](docs/TESTING.md) — couverture des tests
+- [docs/PERFORMANCE.md](docs/PERFORMANCE.md) — analyse perf avec données Romeo
+- [docs/results.md](docs/results.md) — galerie d'images générées
+- [docs/benchmark.md](docs/benchmark.md) — analyse de scaling SLURM
+- [docs/report.md](docs/report.md) — rapport académique
+- [docs/slides.md](docs/slides.md) — slides de présentation
+
 ## Ce que ça fait
 
 Lit une grille échantillon, en extrait toutes les tuiles `N × N`, calcule
-leurs règles d'adjacence, puis génère une nouvelle grille (taille libre) qui
-ne contient localement que des tuiles vues dans l'échantillon.
+leurs règles d'adjacence, puis génère une nouvelle grille (taille libre)
+qui ne contient localement que des tuiles vues dans l'échantillon.
 
-**Backends :**
-- `wfc_serial` — implémentation de référence séquentielle.
-- `wfc_omp` — parallélisé avec `#pragma omp task` (sélection min-entropie + propagation BFS).
-- `wfc_kokkos` — variante Kokkos (`parallel_for` + atomics) pour comparaison.
+Backends :
+- `wfc_serial` — référence séquentielle
+- `wfc_omp` — parallélisé avec `#pragma omp task` (sélection min-entropie + propagation BFS)
+- `wfc_kokkos` — variante Kokkos (`parallel_for` + atomics) pour comparaison
 
-Les trois produisent **un output bit-identique** pour un même seed.
+Les trois produisent un output bit-identique pour un même seed.
 
 ## Build
 
-Pré-requis : un compilateur C++17 avec OpenMP (testé avec g++ 13.3 sur
-Ubuntu 24.04 / WSL2), CMake ≥ 3.16.
+Pré-requis : un compilateur C++17 avec OpenMP, CMake ≥ 3.16.
+Plateformes vérifiées :
+- **Linux** : g++ 13.3 sur Ubuntu 24.04 / WSL2, gcc 14.2 sur Romeo (RHEL 9, AMD EPYC 9654 192 cores).
+- **Windows natif** : MSYS2 + MinGW-w64 UCRT (g++ 16.1, OpenMP 5.2, ninja).
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DUSE_OMP=ON
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_OMP=ON
 cmake --build build -j
 ```
 
-Pour activer Kokkos en plus :
+Pour activer Kokkos en plus (testé avec Kokkos 4.4.01, backends OPENMP+SERIAL) :
 
 ```bash
 ./scripts/build_kokkos.sh   # télécharge et installe Kokkos dans external/
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DUSE_OMP=ON -DUSE_KOKKOS=ON \
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_OMP=ON -DUSE_KOKKOS=ON \
       -DKokkos_ROOT=$PWD/external/kokkos/install
 cmake --build build -j
 ```
@@ -42,8 +57,10 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Quatre suites : grille, extraction de tuiles, règles d'adjacence (avec
-symétrie), solveur (déterminisme + soundness).
+Six suites cœur (`test_bitset`, `test_grid`, `test_grid_io`, `test_tileset`,
+`test_overlap`, `test_solver`) plus deux conditionnels (`test_solver_omp`,
+`test_solver_kokkos`) qui vérifient le déterminisme bit-à-bit serial vs
+backend parallèle pour {1, 2, 4, 8} threads.
 
 ## Usage
 
@@ -98,7 +115,7 @@ par `#` ignorées. Toutes les lignes doivent avoir la même largeur.
 
 Échantillons fournis : `samples/binary_5x5.txt` (exemple du sujet),
 `binary_stripes`, `binary_checker`, `binary_dots`, `multivalue_terrain`,
-`multivalue_maze`.
+`multivalue_maze`, `multivalue_smooth` (3 valeurs, transitions douces).
 
 ## Benchmarks
 
@@ -109,6 +126,32 @@ python3 scripts/plot_results.py results/benchmark.csv
 ```
 
 Le sweep par défaut couvre 32×32, 64×64, 128×128 × {1, 2, 4, 8} threads × {serial, omp, kokkos}.
+
+### Sur Romeo (HPC, AMD EPYC 9654 192c, NVIDIA GH200)
+
+```bash
+sbatch scripts/romeo_full_bench.slurm   # CPU full sweep ~1h
+sbatch scripts/build_kokkos_gpu_romeo.slurm  # GPU build + tests ~15 min
+sbatch scripts/romeo_gpu_bench.slurm    # GPU bench ~10 min
+```
+
+Mesures combinées (jobs 543692 + 544061 + 544356) sur `binary_5x5` :
+
+| Taille  | serial  | omp peak       | omp threads peak | régression 192t |
+|---------|---------|----------------|------------------|-----------------|
+| 64×64   | 0.25 s  | 0.094 s (2.6×) | 8 threads        | 3.93 s (15× plus lent) |
+| 128×128 | 3.97 s  | 0.69 s (5.7×)  | 8 (avec optim)   | 27.3 s (6.9× plus lent) |
+| 256×256 | 61.4 s  | 7.5 s (8.2×)   | 16 threads       | 319 s (5× plus lent) |
+
+L'optim "frontier threshold"
+([WFCSolverOMP.cpp:188](src/solvers/WFCSolverOMP.cpp#L188)) bascule en
+série pour les niveaux BFS courts. Gain mesuré : +10% à 8 threads,
++25% à 64 threads, +29% à 192 threads.
+
+GPU GH200 testé sur `binary_5x5` 128×128 : 5.4 s, 8× plus lent que
+OMP CPU 8 threads. Les H↔D copies par propagate (~16 GB pour 256×256)
+dominent le coût. Voir [docs/benchmark.md](docs/benchmark.md) pour
+l'analyse complète.
 
 ## Rapport et présentation
 

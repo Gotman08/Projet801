@@ -59,6 +59,7 @@ struct Config {
     std::set<std::string> backends = {"serial", "omp"};
     bool write_header = true;
     std::string out_path = "results/benchmark.csv";
+    bool help_only = false;  // set by parse_args() if --help was passed
 };
 
 std::vector<int> parse_int_list(const std::string& s) {
@@ -119,7 +120,7 @@ Config parse_args(int argc, char** argv) {
         else if (k == "--backends")  c.backends = parse_str_set(next_arg());
         else if (k == "--no-header") c.write_header = false;
         else if (k == "-o")          c.out_path = next_arg();
-        else if (k == "-h" || k == "--help") { usage(argv[0]); std::exit(0); }
+        else if (k == "-h" || k == "--help") { usage(argv[0]); c.help_only = true; return c; }
         else { usage(argv[0]); throw std::runtime_error("unknown option: " + k); }
     }
     if (c.sample.empty()) {
@@ -197,9 +198,12 @@ int main(int argc, char** argv) {
         std::cerr << "error: " << e.what() << "\n";
         return 1;
     }
+    if (cfg.help_only) return 0;
 
 #if defined(WFC_HAS_KOKKOS)
-    Kokkos::initialize(argc, argv);
+    // RAII guard: Kokkos::finalize runs on any path out, including
+    // exceptions thrown by read_grid_txt / TileSet::from_sample below.
+    Kokkos::ScopeGuard kokkos_guard(argc, argv);
 #endif
 
     Grid sample = read_grid_txt(cfg.sample);
@@ -220,9 +224,6 @@ int main(int argc, char** argv) {
         csv.open(cfg.out_path, cfg.write_header ? std::ios::out : std::ios::app);
         if (!csv) {
             std::cerr << "cannot open " << cfg.out_path << "\n";
-#if defined(WFC_HAS_KOKKOS)
-            Kokkos::finalize();
-#endif
             return 1;
         }
         out = &csv;
@@ -235,6 +236,14 @@ int main(int argc, char** argv) {
             if (backend == "serial") {
                 run_one(cfg, tiles, rules, rules_s, backend, 1, size, *out);
                 ++total_runs;
+            } else if (backend == "kokkos") {
+                // Kokkos uses the host execution-space concurrency set once
+                // at Kokkos::initialize(); calling solve() with different
+                // "thread" arguments produces identical timings, bloating the
+                // CSV with redundant rows. Log threads=-1 to signal
+                // "default concurrency", and run only once per (size, repeat).
+                run_one(cfg, tiles, rules, rules_s, backend, -1, size, *out);
+                ++total_runs;
             } else {
                 for (int t : cfg.threads) {
                     run_one(cfg, tiles, rules, rules_s, backend, t, size, *out);
@@ -245,9 +254,5 @@ int main(int argc, char** argv) {
     }
 
     std::cerr << "completed " << total_runs << " run groups -> " << cfg.out_path << "\n";
-
-#if defined(WFC_HAS_KOKKOS)
-    Kokkos::finalize();
-#endif
     return 0;
 }

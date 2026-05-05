@@ -1,0 +1,17 @@
+Loading x86_64 (no gpu) environment
+Environment loaded. Spack available.
+=== node info ===
+romeo-c027
+Tue May  5 13:12:26 CEST 2026
+Slurm job 543692 on romeo-c027
+192
+CPU(s):                               384
+On-line CPU(s) list:                  0-191
+Off-line CPU(s) list:                 192-383
+Model name:                           AMD EPYC 9654 96-Core Processor
+Socket(s):                            2
+CPU(s) scaling MHz:                   65%
+NUMA node(s):                         8
+NUMA node0 CPU(s):                    0-23
+
+=== sweep 1: binary L=11, sizes 32-256, all backends ===

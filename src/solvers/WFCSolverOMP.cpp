@@ -177,6 +177,15 @@ bool propagate_tasks(Wave& wave,
     std::vector<ThreadFrontier> thread_next(static_cast<std::size_t>(max_threads));
     for (auto& tf : thread_next) tf.cells.reserve(256);
 
+    // Frontier threshold below which we run the level serially in the
+    // master thread instead of spawning tasks. Tasks have ~10 µs of
+    // wakeup+barrier overhead per level on 192-core EPYC; for short
+    // levels (BFS often produces frontiers of 1-50 cells) this overhead
+    // dominates the work. Empirically, a threshold proportional to the
+    // task pool gives the best results: parallelise only if there are at
+    // least max(64, max_threads) cells to distribute.
+    const int kSerialFallback = std::max(64, max_threads);
+
     #pragma omp parallel shared(frontier, next, frontier_size, next_size, \
                                 wave, rules, in_queue, propagations, \
                                 contradiction, finished, thread_scratch, \
@@ -184,9 +193,35 @@ bool propagate_tasks(Wave& wave,
     {
         while (!finished) {
             const int chunk = std::max(1, frontier_size / (4 * max_threads));
+            const bool use_tasks = frontier_size >= kSerialFallback;
 
             #pragma omp single
             {
+                if (!use_tasks) {
+                    // Serial fast path for short BFS levels. Avoids the
+                    // task creation + barrier overhead that dominates at
+                    // high thread counts on small frontiers.
+                    OffsetScratch& scratch = thread_scratch[0];
+                    std::vector<int>& my_next = thread_next[0].cells;
+                    std::vector<int> local_next;
+                    local_next.reserve(static_cast<std::size_t>(
+                        frontier_size * scratch.offsets));
+                    for (int i = 0; i < frontier_size; ++i) {
+                        process_cell(frontier[i], wave, rules, scratch,
+                                     local_next, propagations, contradiction);
+                        if (contradiction.load(std::memory_order_relaxed)) break;
+                    }
+                    for (int nc : local_next) {
+                        std::uint8_t expected = 0;
+                        if (__atomic_compare_exchange_n(
+                                &in_queue[static_cast<std::size_t>(nc)],
+                                &expected, static_cast<std::uint8_t>(1),
+                                false,
+                                __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+                            my_next.push_back(nc);
+                        }
+                    }
+                } else {
                 for (int start = 0; start < frontier_size; start += chunk) {
                     const int end = std::min(start + chunk, frontier_size);
                     #pragma omp task firstprivate(start, end) \
@@ -222,6 +257,7 @@ bool propagate_tasks(Wave& wave,
                             }
                         }
                     }
+                }
                 }
             } // implicit barrier + all tasks done
 
