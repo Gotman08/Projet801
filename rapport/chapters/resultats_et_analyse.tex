@@ -239,34 +239,44 @@ $6.10\times$ : l'optim ne suffit pas à atteindre le nouveau ceiling
 
 \begin{figure}[H]
 \centering
-\begin{subfigure}[t]{0.48\linewidth}
+\begin{subfigure}[t]{0.31\linewidth}
 \centering
 \includegraphics[width=\linewidth]{results/figures/amdahl/amdahl_terrain_L33_32.png}
-\caption{terrain\_L33 32×32.}
+\caption{terrain 32×32.}
 \end{subfigure}\hfill
-\begin{subfigure}[t]{0.48\linewidth}
+\begin{subfigure}[t]{0.31\linewidth}
 \centering
 \includegraphics[width=\linewidth]{results/figures/amdahl/amdahl_terrain_L33_64.png}
-\caption{terrain\_L33 64×64.}
+\caption{terrain 64×64.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/amdahl/amdahl_terrain_L33_128.png}
+\caption{terrain 128×128, $f=0.94$.}
 \end{subfigure}
 
 \vspace{0.5em}
 
-\begin{subfigure}[t]{0.48\linewidth}
+\begin{subfigure}[t]{0.31\linewidth}
 \centering
-\includegraphics[width=\linewidth]{results/figures/amdahl/amdahl_terrain_L33_128.png}
-\caption{terrain\_L33 128×128, $f = 0.94$.}
+\includegraphics[width=\linewidth]{results/figures/amdahl/amdahl_smooth_N3_32.png}
+\caption{smooth\_N3 32×32.}
 \end{subfigure}\hfill
-\begin{subfigure}[t]{0.48\linewidth}
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/amdahl/amdahl_smooth_N3_64.png}
+\caption{smooth\_N3 64×64.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\linewidth}
 \centering
 \includegraphics[width=\linewidth]{results/figures/amdahl/amdahl_smooth_N3_128.png}
-\caption{smooth\_N3 128×128, $f = 0.74$ (cas limite).}
+\caption{smooth\_N3 128×128, $f=0.74$.}
 \end{subfigure}
 
-\caption{Fits Amdahl par sample. terrain\_L33 suit le même pattern que
-binary\_L11 (croissance de $f$ avec la taille). smooth\_N3 plafonne à
-$f = 0.74$ même à 128×128 : peu de tuiles ($L=12$) et $N=3$ →
-parallélisme structurel limité.}
+\caption{Fits Amdahl par sample × taille. terrain\_L33 suit le même
+pattern que binary\_L11 (croissance de $f$ avec la taille). smooth\_N3
+plafonne à $f = 0.74$ même à 128×128 : peu de tuiles ($L=12$) et
+$N=3$ → parallélisme structurel limité, indépendamment de la grille.}
 \label{fig:amdahl_other_samples}
 \end{figure}
 
@@ -343,6 +353,15 @@ threads est plus douce.}
 \label{fig:heatmap_terrain}
 \end{figure}
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/scaling/speedup_band_terrain_L33.png}
+\caption{Bande min/max terrain\_L33. La dispersion expérimentale
+reste basse jusqu'à 16 threads (régime stable), puis explose au-delà
+(la régression varie d'une exécution à l'autre).}
+\label{fig:speedup_band_terrain}
+\end{figure}
+
 \begin{table}[H]
 \centering
 \begin{tabular}{lrrrrrr}
@@ -392,6 +411,15 @@ au-delà, les barrières BFS dominent.}
 4 threads, quel que soit la taille — comportement borné par la
 structure du sample, pas par la grille.}
 \label{fig:heatmap_smooth}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/scaling/speedup_band_smooth_N3.png}
+\caption{Bande min/max smooth\_N3. La bande s'élargit tôt (dès
+8 threads) : la variance entre runs croît rapidement quand on dépasse
+le sweet spot.}
+\label{fig:speedup_band_smooth}
 \end{figure}
 
 \begin{table}[H]
@@ -475,6 +503,61 @@ Pas de fix algorithmique côté intra-attempt sans risquer de régresser binary.
 \label{fig:optim_frontier}
 \end{figure}
 
+\subsection{Profil de scaling complet \emph{après} optim (binary\_optim)}
+
+Le run \texttt{binary\_optim} re-mesure binary\_L11 128×128 avec
+\texttt{frontier-threshold} activé. On observe ainsi non pas un seul
+nombre (gain à un thread count) mais l'évolution complète du
+speedup, de l'efficacité et du throughput sous le régime optimisé.
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/speedup_binary_optim.png}
+\caption{Speedup binary\_optim 128.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/speedup_band_binary_optim.png}
+\caption{Bande min/max binary\_optim.}
+\end{subfigure}
+
+\caption{Speedup binary\_optim 128×128. Le peak passe de
+$5.27\times$ (binary\_L11) à $6.10\times$ (binary\_optim) à 8 threads,
+et le pic est plus stable (la bande min/max s'amincit).}
+\label{fig:optim_binary_speedup}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/efficiency_binary_optim.png}
+\caption{Efficacité binary\_optim.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/throughput_binary_optim.png}
+\caption{Throughput binary\_optim.}
+\end{subfigure}
+
+\caption{Efficacité et throughput binary\_optim. L'optim ne change pas
+le mur Amdahl mais elle pousse le palier d'efficacité visible : la
+chute sous 50\% se produit plus tard qu'en baseline.}
+\label{fig:optim_binary_eff_thr}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/scaling/heatmap_binary_optim.png}
+\caption{Heatmap binary\_optim. La zone verte (sweet spot) s'élargit
+légèrement vers le haut-droit comparée à binary\_L11
+(Figure~\ref{fig:heatmap_binary}) : l'optim étire la plage de tailles
+× threads exploitable.}
+\label{fig:heatmap_binary_optim}
+\end{figure}
+
 \begin{table}[H]
 \centering
 \begin{tabular}{rrrr}
@@ -546,20 +629,45 @@ travail amortit l'overhead.}
 
 \begin{figure}[H]
 \centering
-\begin{subfigure}[t]{0.48\linewidth}
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/backends_terrain_L33_32.png}
+\caption{terrain 32×32.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/backends_terrain_L33_64.png}
+\caption{terrain 64×64.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\linewidth}
 \centering
 \includegraphics[width=\linewidth]{results/figures/scaling/backends_terrain_L33_128.png}
-\caption{terrain\_L33 128×128.}
-\end{subfigure}\hfill
-\begin{subfigure}[t]{0.48\linewidth}
-\centering
-\includegraphics[width=\linewidth]{results/figures/scaling/backends_smooth_N3_128.png}
-\caption{smooth\_N3 128×128.}
+\caption{terrain 128×128.}
 \end{subfigure}
 
-\caption{Backends sur autres samples 128×128. Sur smooth\_N3,
-Kokkos suit serial très près : peu de parallélisme exploitable. Sur
-terrain\_L33, Kokkos bénéficie davantage de la parallélisation.}
+\vspace{0.5em}
+
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/backends_smooth_N3_32.png}
+\caption{smooth 32×32.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/backends_smooth_N3_64.png}
+\caption{smooth 64×64.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/backends_smooth_N3_128.png}
+\caption{smooth 128×128.}
+\end{subfigure}
+
+\caption{Backends sur \texttt{terrain\_L33} et \texttt{smooth\_N3}, 3
+tailles. Sur smooth\_N3, Kokkos suit serial très près à toutes les
+tailles : peu de parallélisme exploitable. Sur terrain\_L33, Kokkos
+bénéficie davantage de la parallélisation à mesure que la grille
+grandit.}
 \label{fig:backends_other}
 \end{figure}
 
@@ -696,90 +804,426 @@ Work-density gate dans \texttt{propagate\_tasks} & non mesuré & rollback (risqu
 % =============================================================================
 
 Au-delà des chiffres, voici un aperçu qualitatif des grilles produites
-par le solveur. Trois seeds différents par sample montrent la variété
-sans dégrader la cohérence locale (chaque sous-bloc $N \times N$
-apparaît bien dans l'échantillon source).
+par le solveur. Pour chaque sample, l'échantillon d'entrée est placé
+côte à côte avec les sorties générées (mêmes contraintes locales,
+seed différent → variabilité contrôlée).
 
-\subsection{rooms (dungeon binaire)}
+\subsection{Échantillons binaires : input et sortie}
 
 \begin{figure}[H]
 \centering
-\begin{subfigure}[t]{0.31\linewidth}
+\begin{subfigure}[t]{0.45\linewidth}
 \centering
-\includegraphics[width=\linewidth]{results/figures/results/gallery/rooms_seed1.png}
-\caption{seed = 1.}
+\includegraphics[width=0.5\linewidth]{results/figures/results/inputs/binary_5x5_input.png}
+\caption{Input 5×5 (sujet).}
 \end{subfigure}\hfill
-\begin{subfigure}[t]{0.31\linewidth}
+\begin{subfigure}[t]{0.45\linewidth}
 \centering
-\includegraphics[width=\linewidth]{results/figures/results/gallery/rooms_seed7.png}
-\caption{seed = 7.}
-\end{subfigure}\hfill
-\begin{subfigure}[t]{0.31\linewidth}
-\centering
-\includegraphics[width=\linewidth]{results/figures/results/gallery/rooms_seed42.png}
-\caption{seed = 42.}
+\includegraphics[width=0.85\linewidth]{results/figures/results/binary_5x5_64x64_N2_seed42.png}
+\caption{Output 64×64, seed=42.}
 \end{subfigure}
 
-\caption{Sample \texttt{rooms} (binaire, $N=2$, 11 tuiles), 3 seeds.
-Pièces rectangulaires connectées par couloirs ; la composante
-walkable est connexe (vérifiée par flood-fill BFS de \texttt{wfc\_dungeon}).}
-\label{fig:gallery_rooms}
+\caption{Sample \texttt{binary\_5x5} (exemple littéral du sujet,
+11 tuiles à $N=2$). La sortie reproduit les motifs locaux : diagonales
+0/1, zones contiguës de 1, transitions douces. Pas de contradiction
+sur 5 attempts.}
+\label{fig:gallery_binary_5x5}
 \end{figure}
 
-\subsection{skyline (urbain multi-valeurs)}
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=0.6\linewidth]{results/figures/results/inputs/binary_stripes_input.png}
+\caption{stripes (input).}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/binary_stripes_48x48_N2_seed1.png}
+\caption{Output 48×48, seed=1.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/binary_checker_48x48_N2_seed2.png}
+\caption{checker output 48×48.}
+\end{subfigure}
+
+\caption{Cas dégénérés. \texttt{stripes} (2 tuiles) converge vers le
+même motif à un décalage de phase près. \texttt{checker} (2 tuiles)
+reproduit le damier exact. Utilisés par \texttt{test\_overlap} comme
+invariants.}
+\label{fig:gallery_binary_degenerate}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.45\linewidth}
+\centering
+\includegraphics[width=0.5\linewidth]{results/figures/results/inputs/binary_dots_input.png}
+\caption{Input dots 10×10.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.45\linewidth}
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/results/binary_dots_64x64_N2_seed3.png}
+\caption{Output 64×64, seed=3.}
+\end{subfigure}
+
+\caption{Sample \texttt{binary\_dots} (7 tuiles à $N=2$). Les `1`
+isolés sont préservés dans la sortie, jamais agglutinés : la
+contrainte locale impose une séparation par des `0`.}
+\label{fig:gallery_binary_dots}
+\end{figure}
+
+\subsection{Échantillons multi-valeurs : input et sortie}
 
 \begin{figure}[H]
 \centering
 \begin{subfigure}[t]{0.31\linewidth}
 \centering
-\includegraphics[width=\linewidth]{results/figures/results/gallery/skyline_seed1.png}
-\caption{seed = 1.}
+\includegraphics[width=0.7\linewidth]{results/figures/results/inputs/multivalue_terrain_input.png}
+\caption{Input terrain 14×10.}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.31\linewidth}
 \centering
-\includegraphics[width=\linewidth]{results/figures/results/gallery/skyline_seed7.png}
-\caption{seed = 7.}
+\includegraphics[width=\linewidth]{results/figures/results/multivalue_terrain_64x64_N2_seed7.png}
+\caption{Output 64×64.}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.31\linewidth}
 \centering
-\includegraphics[width=\linewidth]{results/figures/results/gallery/skyline_seed42.png}
-\caption{seed = 42.}
+\includegraphics[width=\linewidth]{results/figures/results/multivalue_terrain_128x128_N2_seed11.png}
+\caption{Output 128×128.}
 \end{subfigure}
 
-\caption{Sample \texttt{skyline} (4 valeurs, $N=3$, 79 tuiles), 3 seeds.
-Bâtiments cohérents avec fenêtres et fondations, ciel uniforme. Les
-trois variantes diffèrent dans la disposition mais respectent la
-grammaire locale du sample d'entrée.}
+\caption{Sample \texttt{multivalue\_terrain} (eau/sable/herbe/roche,
+33 tuiles à $N=2$). À 128×128, plusieurs îles indépendantes
+apparaissent : la zone est plus grande que dans l'échantillon, et le
+solveur reproduit uniquement les transitions locales
+(eau→sable→herbe→roche), il ne sait pas qu'il doit faire une seule île.}
+\label{fig:gallery_terrain}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=0.7\linewidth]{results/figures/results/inputs/multivalue_smooth_input.png}
+\caption{Input smooth 12×12.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/multivalue_smooth_64x64_N2_seed17.png}
+\caption{Output 64×64, $N=2$.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/multivalue_smooth_64x64_N3_seed19.png}
+\caption{Output 64×64, $N=3$.}
+\end{subfigure}
+
+\caption{Sample \texttt{multivalue\_smooth} (4 valeurs en gradients
+lisses). Augmenter $N$ (2 → 3) capture des motifs locaux plus précis :
+la sortie reproduit mieux les courbes de transition, au prix d'un
+tile set plus gros et d'un solveur plus lent (12 tuiles à $N=2$
+vs. 73 à $N=3$).}
+\label{fig:gallery_smooth}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.45\linewidth}
+\centering
+\includegraphics[width=0.6\linewidth]{results/figures/results/inputs/multivalue_maze_input.png}
+\caption{Input maze 11×12.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.45\linewidth}
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/results/multivalue_maze_48x48_N2_seed13.png}
+\caption{Output 48×48, seed=13.}
+\end{subfigure}
+
+\caption{Sample \texttt{multivalue\_maze} (3 valeurs : sol/mur/porte,
+24 tuiles à $N=2$). À $N=3$ ce sample est connu pour échouer
+fréquemment (utilisé comme test du failure path dans
+\texttt{test\_edge\_cases}) ; à $N=2$ il converge sans backtracking.}
+\label{fig:gallery_maze}
+\end{figure}
+
+\subsection{Galerie style WFC paper : input + 3 seeds}
+
+Échantillons inspirés du papier WFC original (Maxim Gumin) : skyline
+urbain, plante avec fleurs, dungeon binaire à pièces. Chaque
+échantillon est résolu pour 3 seeds différents, ce qui montre la
+variété produite par le solveur tout en respectant strictement la
+grammaire locale du sample.
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.23\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/inputs/skyline_input.png}
+\caption{Input.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/gallery/skyline_seed1.png}
+\caption{seed=1.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/gallery/skyline_seed7.png}
+\caption{seed=7.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/gallery/skyline_seed42.png}
+\caption{seed=42.}
+\end{subfigure}
+
+\caption{\texttt{skyline} (4 valeurs, $N=3$, 79 tuiles).
+WFC apprend les motifs de fenêtres dans la maçonnerie, les
+silhouettes verticales et la séparation ciel/sol. Trois seeds, trois
+villes plausibles.}
 \label{fig:gallery_skyline}
 \end{figure}
 
-\subsection{plant (plante avec fleurs)}
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.23\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/inputs/plant_input.png}
+\caption{Input.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/gallery/plant_seed1.png}
+\caption{seed=1.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/gallery/plant_seed7.png}
+\caption{seed=7.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/gallery/plant_seed42.png}
+\caption{seed=42.}
+\end{subfigure}
+
+\caption{\texttt{plant} (4 valeurs, $N=3$, 94 tuiles). Tiges, fleurs
+et feuilles cohérentes, ancrées au sol. Cas riche ($L=94$) où
+l'expansion D4 \texttt{--symmetries 4} permettrait une variation
+d'orientation plus marquée.}
+\label{fig:gallery_plant}
+\end{figure}
 
 \begin{figure}[H]
 \centering
-\begin{subfigure}[t]{0.31\linewidth}
+\begin{subfigure}[t]{0.23\linewidth}
 \centering
-\includegraphics[width=\linewidth]{results/figures/results/gallery/plant_seed1.png}
-\caption{seed = 1.}
+\includegraphics[width=\linewidth]{results/figures/results/inputs/rooms_input.png}
+\caption{Input.}
 \end{subfigure}\hfill
-\begin{subfigure}[t]{0.31\linewidth}
+\begin{subfigure}[t]{0.23\linewidth}
 \centering
-\includegraphics[width=\linewidth]{results/figures/results/gallery/plant_seed7.png}
-\caption{seed = 7.}
+\includegraphics[width=\linewidth]{results/figures/results/gallery/rooms_seed1.png}
+\caption{seed=1.}
 \end{subfigure}\hfill
-\begin{subfigure}[t]{0.31\linewidth}
+\begin{subfigure}[t]{0.23\linewidth}
 \centering
-\includegraphics[width=\linewidth]{results/figures/results/gallery/plant_seed42.png}
-\caption{seed = 42.}
+\includegraphics[width=\linewidth]{results/figures/results/gallery/rooms_seed7.png}
+\caption{seed=7.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.23\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/gallery/rooms_seed42.png}
+\caption{seed=42.}
 \end{subfigure}
 
-\caption{Sample \texttt{plant} (4 valeurs, $N=3$, 94 tuiles), 3 seeds.
-Tiges, fleurs et feuilles cohérentes, ancrées au sol. Cas riche
-($L=94$) où l'expansion D4 (\texttt{--symmetries 4 ou 8}, voir
-Chapitre~\ref{chap:extensions}) permettrait une variation orientation
-plus marquée.}
-\label{fig:gallery_plant}
+\caption{\texttt{rooms} (binaire, $N=3$, 14 tuiles). Pièces
+rectangulaires connectées par couloirs étroits ; la composante
+walkable est connexe (vérifiée par flood-fill BFS de
+\texttt{wfc\_dungeon}). Sample utilisé pour la démo UE5
+(Section~\ref{sec:ext:ue5}).}
+\label{fig:gallery_rooms}
 \end{figure}
+
+% =============================================================================
+\section{Synthèse : lecture transversale des figures}
+\label{sec:res:synthese}
+% =============================================================================
+
+Cette section relie les figures précédentes au code source qui produit
+les gains observés, et discute les optimisations qui feraient \emph{mieux
+scaler} le solveur au-delà du peak actuel.
+
+\subsection{Pourquoi le speedup peak vit à 16 threads}
+
+Trois figures lues conjointement expliquent le peak à 16 threads sur
+256×256 :
+
+\begin{itemize}
+    \item Figure~\ref{fig:speedup_binary} (speedup) : la courbe monte
+    jusqu'à 16 threads puis chute brutalement.
+    \item Figure~\ref{fig:efficiency_binary} (efficacité) : à 16
+    threads sur 256×256, $E = 0.51$. Au-delà, $E$ décroche.
+    \item Figure~\ref{fig:amdahl_binary_256} (Amdahl) : le fit donne
+    $f = 0.944$, ceiling théorique $17.8\times$ ; le peak observé
+    n'atteint que 46\% du ceiling.
+\end{itemize}
+
+Le \emph{gap} entre ceiling et peak est imputable à des coûts
+\textit{supra-Amdahl} : la fork/join, la contention atomique, les
+frontières BFS courtes. Aucun de ces coûts n'est modélisé par Amdahl
+(qui suppose un parallélisme parfait sur la fraction $f$). C'est
+exactement le rôle des optims OMP gardées
+(Section~\ref{sec:res:synthesis}) : amincir l'écart entre la courbe
+mesurée et l'asymptote $f$.
+
+\subsection{Lecture du heatmap : où vit le sweet spot}
+
+Le heatmap binary\_L11 (Figure~\ref{fig:heatmap_binary}) trace
+\textbf{taille de grille × threads} avec la couleur = temps. La
+diagonale verte (sweet spot) montre que la taille optimale de grille
+\emph{suit} le nombre de threads. Lecture pratique :
+
+\begin{itemize}
+    \item À 8 threads, optimum vers 128×128.
+    \item À 16 threads, optimum vers 256×256.
+    \item À 32+ threads, on aurait besoin de grilles 512×512 ou plus
+    (qui n'ont pas été mesurées : les runs 4h timeout).
+\end{itemize}
+
+Cette information dimensionne directement les choix d'utilisation
+(Section~\ref{sec:res:recommandations}).
+
+\subsection{Pourquoi smooth\_N3 plafonne}
+
+Le triplet figures \ref{fig:speedup_smooth},
+\ref{fig:scaling_smooth_combo} et \ref{fig:amdahl_other_samples}d
+montre la limite \emph{structurelle} de smooth\_N3 :
+
+\begin{itemize}
+    \item Speedup peak à 2.23× à 4 threads.
+    \item Efficacité chute sous 0.5 dès 8 threads.
+    \item Amdahl $f = 0.74$ même à 128×128 (vs 0.94 pour binary\_L11).
+\end{itemize}
+
+La cause est dans l'algorithme de propagation, pas dans son
+implémentation. Citons le calcul du chunk dans
+\texttt{propagate\_tasks} :
+
+\begin{lstlisting}[language=C++]
+const int chunk = std::max(1, frontier_size / (4 * max_threads));
+const bool use_tasks = frontier_size >= kSerialFallback;
+\end{lstlisting}
+
+Quand \texttt{frontier\_size} reste $< $ \texttt{kSerialFallback} (cas
+smooth\_N3 avec ses motifs lisses qui propagent peu), on retombe en
+série : pas d'opportunité de gain. Le frontier-threshold
+(Figure~\ref{fig:optim_frontier}) ne peut pas réparer un manque de
+parallélisme structurel.
+
+\subsection{Comment le code OMP atteint son ceiling}
+
+Trois optimisations expliquent l'essentiel du gain visible sur les
+courbes \texttt{omp} (Figures~\ref{fig:backends_binary},
+\ref{fig:backends_other}) :
+
+\paragraph{1. Une seule région \texttt{parallel}.} Le squelette de
+\texttt{propagate\_tasks} (voir Chapitre~\ref{chap:openmp},
+Section~\ref{sec:omp:propagate}) ouvre \emph{une seule} région
+parallel et pilote les niveaux BFS via \texttt{\#pragma omp single}.
+Sans cela, on paye 50 µs × 8000 niveaux $\approx 400$ ms de pur
+fork/join — soit plus que le travail utile total.
+
+\paragraph{2. Atomic relaxed-load skip.} Dans
+\texttt{atomic\_and\_with} (Section~\ref{sec:omp:propagate}), une
+lecture relaxed précède le \texttt{lock and} pour éviter l'opération
+quand l'AND serait un no-op. Sur EPYC, le \texttt{lock and} déclenche
+un broadcast d'invalidation cross-NUMA (1-3 µs) ; la lecture relaxed
+ne nécessite que la ligne en \textit{shared} state. Mesuré
+$\sim 50\%$ de trafic atomique en moins.
+
+\paragraph{3. Per-thread frontier alignas(64).} Chaque thread possède
+son \texttt{ThreadFrontier} aligné sur ligne de cache. Pas de faux
+partage entre threads, pas de lock global pour pousser dans la
+frontière suivante (concaténée par le \texttt{single} en fin de
+niveau).
+
+\subsection{Ce que les figures ne montrent pas : les optims rejetées}
+
+Le tableau~\ref{tab:res:rejected} liste 5 optims source-level
+\emph{rejetées} après mesure A/B. C'est aussi instructif que les
+optims gardées :
+
+\begin{itemize}
+    \item Cache thread\_local de \texttt{f * log(f)} : -6.7\%
+    (régression nette). Le cache miss de la table déclasse le calcul
+    flottant inline qu'il était censé éviter.
+    \item \texttt{std::queue} → vector FIFO : 0\% net (dans la
+    variance). Le vector réduit l'allocation mais ne change rien à
+    l'algorithme.
+    \item LTO + PGO : +0.4\% supplémentaire au-dessus de LTO seul.
+    Pas justifié vu la complexité de la chaîne PGO.
+\end{itemize}
+
+\subsection{Optims qui feraient mieux scaler}
+\label{sec:res:scale_better}
+
+Trois optimisations \emph{non implémentées} adresseraient les coûts
+supra-Amdahl visibles dans les figures actuelles. Elles sont
+documentées en détail au Chapitre~\ref{chap:limites} ; voici leur
+impact attendu sur les figures de scaling.
+
+\paragraph{Heuristique d'entropie incrémentale.} La sélection
+min-entropie domine $\sim 85\%$ du temps série
+(Figure~\ref{fig:profile_breakdown}). Maintenir une priority queue
+indexée par cellule, mise à jour incrémentale à chaque collapse,
+ferait passer la sélection de $O(r \cdot c \cdot L)$ par collapse à
+$O(\log(r \cdot c))$ amorti. Pour 256×256 (~65k cellules), facteur
+$\sim 1000$ sur la phase qui domine.
+
+\textbf{Effet attendu sur les figures} : le serial baseline tomberait
+de 61 s à $\sim 1$ s sur 256×256 ; tous les speedups deviendraient
+plus modestes (la fraction parallélisable $f$ chuterait), mais les
+\emph{temps absolus} seraient drastiquement plus bas. Le throughput
+peak passerait de 15 Mcells/s à plusieurs centaines.
+
+\paragraph{NUMA-aware partitioning.} La cause (3) de la régression
+high-thread est la contention atomique \emph{cross-NUMA} (cache-line
+ping-pong, 3× plus cher qu'intra-NUMA sur EPYC 8 NUMA nodes).
+Partitionner la wave par socket et propager les frontières
+inter-partitions via boîtes aux lettres explicites (au lieu d'atomics
+sur mémoire partagée) éliminerait ce coût.
+
+\textbf{Effet attendu} : la régression au-delà de 32 threads
+s'aplatirait, le peak speedup remonterait probablement à
+$12$-$14\times$ à 64 threads (vs $1.26\times$ actuel).
+
+\paragraph{Batch GPU.} Le GPU GH200 est plus lent que le CPU
+(Figure~\ref{fig:backends_binary}) parce qu'on lui donne un seul
+solveur sur une grosse grille. Lancer K solveurs indépendants sur K
+petites grilles, chacun assigné à un SM, exploiterait le
+data-parallelism massif du GPU.
+
+\textbf{Effet attendu} : 32 attempts sur GH200 en parallèle
+prendraient le temps d'un seul attempt, soit $\sim 2$ s pour 32
+solveurs 64×64 (vs $\sim 64$ s en série). Le GPU deviendrait
+intéressant pour les workloads de génération en batch (ex. game
+open-world avec K régions à générer).
+
+\begin{recommendation}
+Si on devait pousser ce projet plus loin, l'ordre de priorité serait :
+\begin{enumerate}
+    \item \textbf{Entropie incrémentale} (PQ ou tournament tree) :
+    meilleur ratio bénéfice/risque, attaque la phase dominante.
+    \item \textbf{Batch GPU} : seule voie réaliste pour rentabiliser
+    le port Kokkos/CUDA déjà en place.
+    \item \textbf{NUMA partitioning} : refactor lourd, gain visible
+    seulement à très haut thread count (utile sur Romeo, marginal
+    ailleurs).
+\end{enumerate}
+\end{recommendation}
 
 % =============================================================================
 \section{Recommandations d'utilisation}
