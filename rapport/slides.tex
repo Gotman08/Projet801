@@ -79,6 +79,9 @@
 \node[anchor=north west] at ([shift={(0.3cm,-0.15cm)}]current page.north west) {%
   \includegraphics[height=0.75cm]{assets/logo-urca.png}%
 };
+\node[anchor=north west] at ([shift={(2.6cm,-0.15cm)}]current page.north west) {%
+  \includegraphics[height=0.75cm]{assets/logo.jpg}%
+};
 % Ligne de séparation en bas
 \draw[burgundy, line width=0.5pt]
   ([shift={(0.5cm,1.2cm)}]current page.south west) --
@@ -92,7 +95,7 @@
 };
 \end{tikzpicture}
 
-\vspace{1cm}
+\vspace{1.2cm}
 
 {\color{burgundy}\fontsize{20}{24}\selectfont\bfseries Wave Function Collapse}\\[0.1cm]
 {\color{burgundy}\rule{0.6\textwidth}{1pt}}\\[0.2cm]
@@ -100,7 +103,7 @@
 
 {\itshape\color{black}\large Romain Despoullains, Nicolas Marano}
 \hfill
-\raisebox{-1.5cm}{\includegraphics[width=5cm]{results/figures/results/gallery/skyline_seed42.png}}
+\raisebox{-0.8cm}{\includegraphics[width=3.2cm]{results/figures/results/gallery/skyline_seed42.png}}
 
 \vfill
 \end{frame}
@@ -110,23 +113,27 @@
 \setbeamercolor{section in toc}{fg=black}
 \setbeamercolor{subsection in toc}{fg=burgundy!80!black}
 \setbeamertemplate{section in toc}[sections numbered]
+\setbeamertemplate{subsection in toc}{\hspace{1em}{\color{burgundy!80!black}\scriptsize\inserttocsectionnumber.\inserttocsubsectionnumber}~~{\small\color{burgundy!60!black}\inserttocsubsection}\par}
 \begin{columns}[T]
-\begin{column}{0.45\textwidth}
-\tableofcontents[sections={1-3}]
+\begin{column}{0.47\textwidth}
+\tableofcontents[sections={1-4}]
 \end{column}
 \begin{column}{0.02\textwidth}
 \centering
 \vspace{-0.3cm}
-{\color{burgundy}\rule{1.5pt}{0.55\textheight}}
+{\color{burgundy}\rule{1.5pt}{0.6\textheight}}
 \end{column}
-\begin{column}{0.45\textwidth}
-\tableofcontents[sections={4-6}]
+\begin{column}{0.47\textwidth}
+\tableofcontents[sections={5-7}]
 \end{column}
 \end{columns}
 \end{frame}
 
 % ============================================================
 \section{Le problème WFC}
+\subsection{Sample $\to$ output}
+\subsection{Compatibilité par overlap}
+\subsection{Algorithme séquentiel}
 
 \begin{frame}{Le problème en une figure}
 \begin{columns}[c]
@@ -206,24 +213,26 @@ sur la zone de recouvrement (en jaune).
 \end{frame}
 
 % ============================================================
-\section{Architecture du code}
+\section{Architecture et structures}
+\subsection{Trois libs CMake}
+\subsection{Wave NUMA-friendly}
 
 \begin{frame}{Architecture : trois libs CMake}
 \begin{center}
 \begin{tikzpicture}[
-    every node/.style={font=\ttfamily\small},
-    lib/.style={draw, rounded corners=2pt, fill=burgundy!15, minimum height=0.7cm, inner sep=4pt},
-    backend/.style={draw, rounded corners=2pt, fill=gold!15, minimum height=0.7cm, inner sep=4pt},
+    lib/.style={draw, rounded corners=2pt, fill=burgundy!15, minimum height=0.65cm, inner sep=4pt, font=\sffamily\small},
+    backend/.style={draw, rounded corners=2pt, fill=gold!15, minimum height=0.65cm, inner sep=4pt, font=\sffamily\small},
+    bin/.style={draw, fill=burgundy!5, rounded corners=2pt, minimum height=0.5cm, inner sep=2pt, font=\sffamily\scriptsize},
     arrow/.style={->, >=stealth, burgundy, thick},
-    scale=0.9, transform shape,
+    scale=0.95, transform shape,
 ]
 \node[lib] (core) at (0,0) {wfc\_core};
-\node[backend] (omp) at (-3.5,-1.8) {wfc\_omp\_lib};
-\node[backend] (kokkos) at (3.5,-1.8) {wfc\_kokkos\_lib};
-\node[draw, fill=burgundy!5, rounded corners=2pt, font=\ttfamily\scriptsize, minimum height=0.5cm, inner sep=2pt] (s1) at (-6,-3.2) {wfc\_serial};
-\node[draw, fill=burgundy!5, rounded corners=2pt, font=\ttfamily\scriptsize, minimum height=0.5cm, inner sep=2pt] (s2) at (-3.5,-3.2) {wfc\_omp};
-\node[draw, fill=burgundy!5, rounded corners=2pt, font=\ttfamily\scriptsize, minimum height=0.5cm, inner sep=2pt] (s3) at (3.5,-3.2) {wfc\_kokkos};
-\node[draw, fill=burgundy!5, rounded corners=2pt, font=\ttfamily\scriptsize, minimum height=0.5cm, inner sep=2pt] (s4) at (6,-3.2) {wfc\_dungeon};
+\node[backend] (omp) at (-3.6,-1.7) {wfc\_omp\_lib};
+\node[backend] (kokkos) at (3.6,-1.7) {wfc\_kokkos\_lib};
+\node[bin] (s1) at (-6,-3.0) {wfc\_serial};
+\node[bin] (s2) at (-3.6,-3.0) {wfc\_omp};
+\node[bin] (s3) at (3.6,-3.0) {wfc\_kokkos};
+\node[bin] (s4) at (6,-3.0) {wfc\_dungeon};
 \draw[arrow] (core) -- (omp);
 \draw[arrow] (core) -- (kokkos);
 \draw[arrow] (core.south) -- (s1.north);
@@ -233,11 +242,12 @@ sur la zone de recouvrement (en jaune).
 \end{tikzpicture}
 \end{center}
 
-\vspace{0.2cm}
+\vspace{0.1cm}
 \begin{itemize}
+\footnotesize
     \item \texttt{wfc\_core} : Grid, TileSet, OverlapRules, Wave, Bitset, SolverBase, SolverSerial.
     \item Backends opt-in : \texttt{wfc\_serial} ne lie pas OMP, \texttt{wfc\_omp} ne lie pas Kokkos.
-    \item Pattern \textbf{Template Method} : SolverBase tient le retry/stats/dispatch, chaque backend fournit \texttt{pick\_cell()} et \texttt{propagate()}.
+    \item Pattern \textbf{Template Method} : SolverBase tient retry/stats/dispatch, chaque backend fournit \texttt{pick\_cell()} et \texttt{propagate()}.
 \end{itemize}
 \end{frame}
 
@@ -270,6 +280,11 @@ sur la zone de recouvrement (en jaune).
 
 % ============================================================
 \section{Profilage et OpenMP}
+\subsection{Profilage série}
+\subsection{Min-entropie chunkée}
+\subsection{Single parallel region}
+\subsection{Atomic relaxed-load}
+\subsection{A/B des optimisations}
 
 \begin{frame}{Profilage série : où paralléliser ?}
 \begin{columns}[T]
@@ -446,7 +461,42 @@ Hoist \texttt{wave.at(c)} & 0\% var \\
 \end{frame}
 
 % ============================================================
+\begin{frame}{Bilan des optimisations en gain temps}
+\begin{columns}[T]
+\begin{column}{0.50\textwidth}
+\includegraphics[width=\textwidth]{results/figures/optim/frontier_threshold_compare.png}\\
+{\scriptsize A/B frontier-threshold sur Romeo (job SLURM 544356)}
+\end{column}
+\begin{column}{0.46\textwidth}
+\textbf{Cumul des optims gardées}
+\begin{block}{binary\_L11 256$\times$256, Romeo}
+\centering
+\footnotesize
+\begin{tabular}{lrr}
+\toprule
+\textbf{Configuration} & \textbf{Temps} & \textbf{Speedup} \\
+\midrule
+Serial (1t) & 61.4\,s & 1.0$\times$ \\
+\midrule
+OMP 8t baseline & 9.13\,s & 6.7$\times$ \\
+OMP 16t baseline & 7.55\,s & 8.13$\times$ \\
++ relaxed-load skip & 7.5\,s & 8.18$\times$ \\
++ frontier-threshold & 7.46\,s & \textbf{8.23$\times$} \\
++ LTO & 7.21\,s & 8.52$\times$ \\
+\bottomrule
+\end{tabular}
+\end{block}
+
+\vspace{0.2cm}
+{\footnotesize Chaque optim ajoute un gain mesuré indépendamment ; cumul $\sim 8.5\times$ vs serial.}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ============================================================
 \section{Kokkos et GPU}
+\subsection{Architecture portable}
+\subsection{Contraintes GPU}
 
 \begin{frame}{Kokkos : architecture}
 \begin{columns}[T]
@@ -523,6 +573,8 @@ void operator()(const int idx) const {
 
 % ============================================================
 \section{Extensions et démo UE5}
+\subsection{Parallel-attempts, D4, backtrack}
+\subsection{Démo Unreal Engine 5}
 
 \begin{frame}{Extensions opt-in}
 \begin{columns}[T]
@@ -600,7 +652,70 @@ void operator()(const int idx) const {
 \end{frame}
 
 % ============================================================
+\section{Tests et validation}
+\subsection{Suite de tests}
+\subsection{Déterminisme bit-à-bit}
+
+\begin{frame}{Tests et validation}
+\begin{columns}[T]
+\begin{column}{0.50\textwidth}
+\textbf{15 suites, 24\,980 invariants}
+\begin{block}{Tests par couche}
+\centering
+\footnotesize
+\begin{tabular}{lr}
+\toprule
+\textbf{Suite} & \textbf{Checks} \\
+\midrule
+\texttt{test\_bitset} & 310 \\
+\texttt{test\_grid} + \texttt{test\_grid\_io} & 848 \\
+\texttt{test\_overlap} & 4\,898 \\
+\texttt{test\_wave} & 8\,594 \\
+\texttt{test\_solver\_common} & 9\,060 \\
+\texttt{test\_edge\_cases} & 404 \\
+\texttt{test\_solver\_omp} + \texttt{kokkos} & 58 \\
+\midrule
+\textbf{TOTAL} & \textbf{24\,980} \\
+\bottomrule
+\end{tabular}
+\end{block}
+\end{column}
+\begin{column}{0.46\textwidth}
+\textbf{Couverture}
+\begin{itemize}
+\footnotesize
+    \item \textbf{99\% line coverage} (gcovr 8.6, 925 / 933 lignes)
+    \item Build dédié \texttt{Debug + --coverage}
+    \item ThreadSanitizer (\texttt{USE\_TSAN=ON}) : 0 race
+\end{itemize}
+
+\vspace{0.2cm}
+\textbf{Tests d'invariants > tests d'output}
+\begin{itemize}
+\footnotesize
+    \item Sortie n'utilise que tuiles du sample
+    \item Symétrie des règles overlap
+    \item $\text{rotated}_{90}^4 = \text{identité}$
+    \item Bit-identité serial = OMP = Kokkos pour $\{1, 2, 4, 8\}$ threads
+\end{itemize}
+
+\vspace{0.2cm}
+\begin{exampleblock}{Vérification déterminisme}
+\centering
+\footnotesize
+\texttt{diff out\_serial.txt out\_omp.txt} \\
+$\to$ identique
+\end{exampleblock}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ============================================================
 \section{Résultats}
+\subsection{Protocole SLURM Romeo}
+\subsection{Speedup et scaling}
+\subsection{Heatmap et Amdahl}
+\subsection{Galerie WFC}
 
 \begin{frame}{Protocole expérimental}
 \begin{columns}[T]
@@ -707,47 +822,49 @@ void operator()(const int idx) const {
 \end{frame}
 
 % ============================================================
-\begin{frame}{Galerie de sorties WFC}
-\begin{columns}[T]
-\begin{column}{0.32\textwidth}
+\begin{frame}{Galerie : input $\to$ output}
+\begin{columns}[c]
+\begin{column}{0.5\textwidth}
 \centering
-\includegraphics[height=2.6cm]{results/figures/results/gallery/rooms_seed42.png}\\[1pt]
-{\scriptsize rooms ($N=3$, binaire)}
+{\scriptsize \textbf{binary\_5x5} (5$\times$5, $N=2$, 11 tuiles)}\\[2pt]
+\includegraphics[height=1.7cm]{results/figures/results/inputs/binary_5x5_input.png}
+\hspace{0.3cm}$\to$\hspace{0.3cm}
+\includegraphics[height=1.7cm]{results/figures/results/binary_5x5_64x64_N2_seed42.png}\\[1pt]
+{\tiny input \hspace{1.2cm} output 64$\times$64}
 \end{column}
-\begin{column}{0.32\textwidth}
+\begin{column}{0.5\textwidth}
 \centering
-\includegraphics[height=2.6cm]{results/figures/results/gallery/skyline_seed42.png}\\[1pt]
-{\scriptsize skyline ($N=3$, 4 valeurs)}
-\end{column}
-\begin{column}{0.32\textwidth}
-\centering
-\includegraphics[height=2.6cm]{results/figures/results/gallery/plant_seed42.png}\\[1pt]
-{\scriptsize plant ($N=3$, 4 valeurs)}
+{\scriptsize \textbf{terrain} (14$\times$10, $N=2$, 33 tuiles)}\\[2pt]
+\includegraphics[height=1.7cm]{results/figures/results/inputs/multivalue_terrain_input.png}
+\hspace{0.3cm}$\to$\hspace{0.3cm}
+\includegraphics[height=1.7cm]{results/figures/results/multivalue_terrain_128x128_N2_seed11.png}\\[1pt]
+{\tiny input \hspace{1.2cm} output 128$\times$128}
 \end{column}
 \end{columns}
 
 \vspace{0.2cm}
 
-\begin{columns}[T]
-\begin{column}{0.32\textwidth}
+\begin{columns}[c]
+\begin{column}{0.5\textwidth}
 \centering
-\includegraphics[height=2.4cm]{results/figures/results/binary_5x5_64x64_N2_seed42.png}\\[1pt]
-{\scriptsize binary\_5x5 (sujet, $N=2$)}
+{\scriptsize \textbf{skyline} (16$\times$14, $N=3$, 79 tuiles)}\\[2pt]
+\includegraphics[height=1.7cm]{results/figures/results/inputs/skyline_input.png}
+\hspace{0.3cm}$\to$\hspace{0.3cm}
+\includegraphics[height=1.7cm]{results/figures/results/gallery/skyline_seed42.png}\\[1pt]
+{\tiny input \hspace{1.2cm} output (seed=42)}
 \end{column}
-\begin{column}{0.32\textwidth}
+\begin{column}{0.5\textwidth}
 \centering
-\includegraphics[height=2.4cm]{results/figures/results/multivalue_terrain_128x128_N2_seed11.png}\\[1pt]
-{\scriptsize terrain ($N=2$, 33 tuiles)}
-\end{column}
-\begin{column}{0.32\textwidth}
-\centering
-\includegraphics[height=2.4cm]{results/figures/results/multivalue_smooth_64x64_N3_seed19.png}\\[1pt]
-{\scriptsize smooth ($N=3$, gradients)}
+{\scriptsize \textbf{plant} (16$\times$15, $N=3$, 94 tuiles)}\\[2pt]
+\includegraphics[height=1.7cm]{results/figures/results/inputs/plant_input.png}
+\hspace{0.3cm}$\to$\hspace{0.3cm}
+\includegraphics[height=1.7cm]{results/figures/results/gallery/plant_seed42.png}\\[1pt]
+{\tiny input \hspace{1.2cm} output (seed=42)}
 \end{column}
 \end{columns}
 
-\vspace{0.1cm}
-{\footnotesize Tous obtenus avec \texttt{wfc\_serial} (bit-identique en OMP/Kokkos).}
+\vspace{0.15cm}
+{\footnotesize Tous obtenus avec \texttt{wfc\_serial}, bit-identiques en OMP et Kokkos pour le même seed.}
 \end{frame}
 
 % ============================================================
