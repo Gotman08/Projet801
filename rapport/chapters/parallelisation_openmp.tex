@@ -190,7 +190,7 @@ bool atomic_and_with(BitsetView dst, ConstBitsetView src) {
     const std::size_t n = dst.word_count();
     for (std::size_t i = 0; i < n; ++i) {
         const u64 mask = s[i];
-        if (mask == ~0ULL) continue;  // skip no-op
+        if (mask == 0xFFFFFFFFFFFFFFFFULL) continue;  // skip no-op
 
         // Optim : relaxed load before lock and (skip if no-op)
         const u64 cur = __atomic_load_n(&d[i], __ATOMIC_RELAXED);

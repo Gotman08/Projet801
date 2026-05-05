@@ -192,8 +192,9 @@ contient une valeur que `wfc_dungeon` ne connaît pas
 ## 6.2. Donjons multi-pièces avec règles spécifiques
 
 Le solveur respecte tout sample, tu peux dessiner un sample plus
-sophistiqué (corridors, salles, stairs, ...) du moment qu'il reste
-2D. Plus le sample est riche, plus le donjon généré aura de variété.
+sophistiqué (corridors, salles, portes, ...) du moment qu'il reste
+2D mono-étage. Plus le sample est riche, plus le donjon généré aura
+de variété.
 
 ## 6.3. Coins et T-junctions
 
@@ -237,20 +238,49 @@ spawn des composants. Va dans `Build → Build Paths` (ou `Ctrl+P`).
 
 # 8. Limitations actuelles (v1)
 
-- Pas de multi-étages (Z toujours = 0).
-- Pas de coins dédiés (le `WallMesh` est rotaté pour les coins).
-- Pas de génération de NavMesh ni d'éclairage automatiques.
+- Mono-étage uniquement (Z toujours = 0). Le support multi-étages a
+  été essayé puis retiré (commit `5f61397`) pour aligner le plugin
+  sur la démo simplifiée ; le code mort (`--levels`, `--floor-height`,
+  `--stair-id`, `LevelGrid`, `place_stairs`) a été nettoyé.
+- Pas de coins dédiés (le `WallMesh` est rotaté pour les coins). Un
+  `CornerMesh` dédié est exposé dans `FTileVariants` mais non utilisé
+  pour la génération automatique.
+- Pas d'éclairage automatique (à placer à la main).
 - Pas d'undo dans l'éditeur (utilise `Clear Generated`).
 - Le plugin est marqué `Runtime` donc disponible en build packagé,
   mais l'utilité du `Generate From Json` à runtime est limitée
   (l'acteur est conçu pour la phase éditeur).
 
-# 9. Pistes d'évolution
+# 9. Features livrées dans le plugin
 
-- Ajout d'un `CornerMesh` dédié et détection de coin convexe/concave.
-- Support des escaliers (multi-étages) via une grille 3D.
-- Choix random du variant parmi plusieurs `WallMesh` (mur cassé, mur
-  ornementé, ...) pour casser la répétition visuelle.
-- Bake automatique du NavMesh post-`Generate`.
-- Un nouveau `EditorUtilityWidget` pour éviter d'avoir à drag-drop
-  l'acteur, bouton "Generate Dungeon" depuis un panneau custom.
+- **Mesh variants** : `Floor/Wall/Corner/Door MeshVariants` arrays
+  permettent de varier les meshes par tile id (random pick avec
+  fallback single-mesh). Casse la répétition visuelle.
+- **Auto NavMeshBoundsVolume** : un volume de navigation est spawné
+  automatiquement, dimensionné sur toute la grille via `UCubeBuilder`
+  en éditeur. Plus besoin de placer manuellement le NavMesh.
+- **Wall on borders** : flag `bWallOnBorders` (true par défaut) ferme
+  le pourtour du dungeon avec des walls.
+- **Gameplay actors** :
+  - `PlayerStartClass` placé sur les 4 cellules walkable les plus
+    proches du centre.
+  - `CornerSpawnerClass` (NPC spawners) sur N cellules walkable
+    aléatoires (`NumCornerSpawners`).
+  - `RandomPickupClass` sur M cellules walkable aléatoires
+    (`NumRandomPickups`).
+  - Allocation sans recouvrement entre les trois catégories.
+- **Generate Random** : bouton CallInEditor qui spawn `wfc_dungeon.exe`
+  en sous-processus avec un seed frais, écrit le JSON dans
+  `Saved/WFCTemp`, puis chaîne le parsing immédiat.
+- **Z offsets séparés** : `GameplayActorZOffsetCm` et
+  `PlayerStartZOffsetCm` pour positionner correctement les capsules
+  `APlayerStart` (qui descendent ~88 cm sous leur origine).
+
+# 10. Pistes d'évolution restantes
+
+- Ajout d'un `CornerMesh` dédié réellement utilisé (détection
+  convexe/concave automatique).
+- Support multi-étages réintroduit avec une vraie grille 3D si le
+  besoin se présente.
+- `EditorUtilityWidget` panneau custom pour éviter le drag-drop de
+  l'acteur dans la level.

@@ -287,23 +287,19 @@ WFC est massivement utilisé pour la génération de niveaux dans les jeux. Pour
 
 \begin{figure}[H]
 \centering
-\fbox{\parbox{0.9\textwidth}{\centering
-Voir \texttt{schemas/ue5\_pipeline.md} pour le prompt de génération.\\
-\texttt{wfc\_dungeon} CLI → JSON (multi-étages, stairs, walkable cells) → \\
-plugin UE5 → \texttt{ADungeonGenerator} AActor → \texttt{StaticMeshComponent} par cellule.
-}}
-\caption{Pipeline asset → JSON → spawn de meshes UE5.}
+\schemaImage{Pipeline wfc-dungeon vers UE5 plugin}
+\caption{Pipeline asset → JSON → spawn de meshes UE5 + gameplay actors.}
 \label{fig:ue5_pipeline}
 \end{figure}
 
 \subsection{Format JSON}
 
-JSON v1 (mono-étage) :
 \begin{lstlisting}[language=C++]
 {
   "version": 1,
   "metadata": { "sample": "...", "N": 2, "seed": 42 },
-  "grid": { "rows": 24, "cols": 24, "cell_size_cm": 200 },
+  "grid": { "rows": 24, "cols": 24, "cell_size_cm": 200,
+            "wall_height_cm": 300 },
   "tile_alphabet": [ {"id": 0, "name": "floor"}, ... ],
   "cells": [
     { "row": 0, "col": 0, "tile_id": 0, "tile_name": "floor",
@@ -313,20 +309,64 @@ JSON v1 (mono-étage) :
 }
 \end{lstlisting}
 
-JSON v2 (multi-étages) ajoute un wrapper \texttt{"levels": [...]} et inclut un placement automatique d'escaliers entre étages adjacents (cellule \texttt{walkable} commune à deux niveaux successifs).
+Le pipeline est strictement \textbf{single-floor}. Une version
+antérieure proposait un schéma v2 multi-étages avec auto-placement
+d'escaliers ; le plugin UE5 a été simplifié pour coller au cas
+mono-étage qui couvre les besoins de la démo, et le code mort
+correspondant (flags \texttt{--levels}, \texttt{--floor-height},
+\texttt{--stair-id}, struct \texttt{LevelGrid}, \texttt{place\_stairs},
+branche multi-floor de \texttt{write\_dungeon\_json}) a été retiré.
 
 \subsection{Connectivité par flood-fill BFS}
 
-Avant d'émettre le JSON, \texttt{wfc\_dungeon} vérifie qu'à chaque étage les cellules \textit{walkable} forment une composante connexe (par flood-fill BFS). Si plusieurs composantes sont détectées, l'algorithme re-roll avec un nouveau seed (jusqu'à \texttt{--connectivity-attempts} fois). Garantit qu'un joueur peut traverser tout le niveau.
+Avant d'émettre le JSON, \texttt{wfc\_dungeon} vérifie que les cellules
+\textit{walkable} forment une composante connexe (flood-fill BFS). Si
+plusieurs composantes sont détectées, l'algorithme re-roll avec un
+nouveau seed (jusqu'à \texttt{--connectivity-attempts} fois). Garantit
+qu'un joueur peut traverser tout le niveau.
 
 \subsection{Plugin UE 5.7}
 
 Le plugin \texttt{ue5\_plugin/WFCDungeon/} contient :
+
 \begin{itemize}
-    \item \texttt{UTileMappingDataAsset} : DataAsset qui mappe chaque \texttt{tile\_id} vers un struct \{floor, wall, corner, door StaticMesh*\} + flags \texttt{bIsSolid}/\texttt{bIsDoor} + offset/scale.
-    \item \texttt{ADungeonGenerator} : AActor avec fonctions \textit{CallInEditor} \textit{Generate From Json} / \textit{Clear Generated}. Parse le JSON, walke les cells, spawne les \texttt{StaticMeshComponent} avec yaw cardinal (-90°N, +90°S, 0°E, 180°W).
+    \item \texttt{UTileMappingDataAsset} : DataAsset qui mappe chaque \texttt{tile\_id} vers un struct \{floor, wall, corner, door StaticMesh* + \texttt{*MeshVariants} arrays\} + flags \texttt{bIsSolid}/\texttt{bIsDoor} + offset/scale. Les arrays de variants permettent de varier les meshes par tile id (random pick avec fallback single-mesh).
+    \item \texttt{ADungeonGenerator} : AActor qui parse le JSON, walke les cells, et spawne les \texttt{StaticMeshComponent} avec yaw cardinal (-90°N, +90°S, 0°E, 180°W).
 \end{itemize}
+
+\subsection{Gameplay actors et navmesh}
+
+Au-delà du spawn de meshes statiques, \texttt{ADungeonGenerator}
+expose des slots \texttt{TSubclassOf<AActor>} qui transforment le
+dungeon en mini-game scaffold prêt à l'emploi :
+
+\begin{itemize}
+    \item \texttt{PlayerStartClass} : placé sur les 4 cellules walkable les plus proches du centre.
+    \item \texttt{CornerSpawnerClass} (NPC spawners) : scattered sur \texttt{NumCornerSpawners} cellules walkable aléatoires.
+    \item \texttt{RandomPickupClass} : scattered sur \texttt{NumRandomPickups} cellules walkable aléatoires.
+    \item L'allocation garantit qu'aucune cellule n'héberge deux catégories d'actors simultanément.
+    \item Z-offsets séparés (\texttt{GameplayActorZOffsetCm}, \texttt{PlayerStartZOffsetCm}) pour positionner correctement les capsules \texttt{APlayerStart} (qui descendent ~88 cm sous leur origine) au-dessus du sol.
+\end{itemize}
+
+\textbf{Volume de navigation auto-calculé} : un
+\texttt{ANavMeshBoundsVolume} est spawné automatiquement, dimensionné
+sur toute la grille via \texttt{UCubeBuilder} en éditeur (les polygones
+de la brush sont reconstruits pour matcher visuellement le dungeon).
+En runtime, fallback sur le scaling de l'actor.
+
+\textbf{Bouton \textit{Generate Random}} : un appel
+\textit{CallInEditor} qui spawn \texttt{wfc\_dungeon.exe} en
+sous-processus avec un seed frais, écrit le JSON dans
+\texttt{Saved/WFCTemp}, et chaîne le parsing immédiat. Une seule action
+pour générer un nouveau dungeon.
+
+\textbf{Périmètre fermé} : le flag \texttt{bWallOnBorders} (true par
+défaut) ferme le pourtour du dungeon avec des walls, ce qui est utile
+pour empêcher le joueur de sortir de la zone walkable.
 
 \subsection{Build opt-in}
 
-\texttt{-DBUILD\_DUNGEON=ON} active la cible. Sans, la cible n'est pas générée du tout (vérifié : \texttt{ninja: no work to do} après reconfigure). Aucun impact sur le benchmark, les ctests, ou les solveurs parallèles.
+\texttt{-DBUILD\_DUNGEON=ON} active la cible \texttt{wfc\_dungeon}.
+Sans, la cible n'est pas générée du tout (vérifié :
+\texttt{ninja: no work to do} après reconfigure). Aucun impact sur le
+benchmark, les ctests, ou les solveurs parallèles.

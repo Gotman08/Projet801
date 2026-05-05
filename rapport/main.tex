@@ -235,7 +235,7 @@
     {>}{{{\color{ipython_purple}>}}}1
     {|}{{{\color{ipython_purple}|}}}1
     {\&}{{{\color{ipython_purple}\&}}}1
-    {~}{{{\color{ipython_purple}~}}}1
+    {~}{{{\color{ipython_purple}\char126}}}1
     %
     {==}{{{\color{ipython_purple}==}}}2
     {<=}{{{\color{ipython_purple}<=}}}2
@@ -275,6 +275,17 @@
 
 % Command for horizontal rule on title page
 \newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+
+% Schema placeholder : standardised fbox describing where to paste a
+% generated PNG. Usage : \schemaImage{caption description}.
+% When the user has saved the PNG into results/figures/schemas/, they
+% replace the call site with \includegraphics{results/figures/schemas/foo.png}.
+\newcommand{\schemaImage}[1]{%
+  \fbox{\parbox{0.85\textwidth}{\centering\small\itshape%
+    [Schema PNG to be generated via ChatGPT\\%
+    (prompt in \texttt{schemas/} folder).]\\[1ex]%
+    \textbf{Sujet du schema :} #1}}%
+}
 
 % Informations du document
 \title{Cours}

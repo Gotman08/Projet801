@@ -8,16 +8,16 @@
 
 \subsection{Linux / WSL2}
 
-\begin{lstlisting}[language=bash]
+\begin{verbatim}
 sudo apt install build-essential cmake ninja-build
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_OMP=ON
 cmake --build build -j
 ctest --test-dir build --output-on-failure
-\end{lstlisting}
+\end{verbatim}
 
 \subsection{Windows MSYS2 + MinGW UCRT}
 
-\begin{lstlisting}[language=bash]
+\begin{verbatim}
 # MSYS2 shell
 pacman -Sy --needed mingw-w64-ucrt-x86_64-toolchain \
     mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
@@ -25,24 +25,24 @@ pacman -Sy --needed mingw-w64-ucrt-x86_64-toolchain \
 $env:Path = "C:\msys64\ucrt64\bin;$env:Path"
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_OMP=ON
 cmake --build build -j
-\end{lstlisting}
+\end{verbatim}
 
 \subsection{Romeo (HPC, x64cpu)}
 
-\begin{lstlisting}[language=bash]
+\begin{verbatim}
 ssh romeo
 cd ~/wfc801
 romeo_load_x64cpu_env
-spack load /56vu72q   # cmake@3.31.8 %aocc
-spack load /tpamt4u   # ninja@1.12.1 %aocc
+spack load /56vu72q
+spack load /tpamt4u
 spack load gcc@14.2.0
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_OMP=ON
 cmake --build build -j
-\end{lstlisting}
+\end{verbatim}
 
 \subsection{Romeo armgpu (Kokkos+CUDA)}
 
-\begin{lstlisting}[language=bash]
+\begin{verbatim}
 salloc --partition=instant --constraint=armgpu --gpus-per-node=1 \
     --time=01:00:00 --account=r250127
 romeo_load_armgpu_env
@@ -57,19 +57,22 @@ cmake -B build_cuda -G Ninja -DCMAKE_BUILD_TYPE=Release \
     -DUSE_OMP=ON -DUSE_KOKKOS=ON -DUSE_LTO=ON \
     -DKokkos_ROOT="$PWD/external/kokkos/install_cuda"
 cmake --build build_cuda -j
-\end{lstlisting}
+\end{verbatim}
 
 \subsection{Démo UE5}
 
-\begin{lstlisting}[language=bash]
+\begin{verbatim}
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_OMP=ON \
     -DBUILD_DUNGEON=ON
 cmake --build build -j
-./build/wfc_dungeon samples/multivalue_maze.txt --rows 24 --cols 24 \
-    -N 2 --seed 42 --levels 3 -o dungeon.json
+./build/wfc_dungeon samples/rooms.txt --rows 24 --cols 24 \
+    -N 2 --seed 42 --connectivity-attempts 5 -o dungeon.json
 # Puis dans UE5 : drag ADungeonGenerator dans le niveau,
-# set JsonPath + TileMapping, click Generate From Json
-\end{lstlisting}
+# set JsonPath + TileMapping (avec MeshVariants pour la variete),
+# optionnellement set PlayerStartClass / CornerSpawnerClass /
+# RandomPickupClass, click Generate From Json (ou Generate Random
+# pour relancer le solver avec un nouveau seed).
+\end{verbatim}
 
 % =============================================================================
 \section{Format CSV des benchmarks}
@@ -170,7 +173,7 @@ Backtracking + delta snapshot (\texttt{--backtrack}) & extension récupération 
 \label{sec:annexes:tests}
 % =============================================================================
 
-\begin{lstlisting}[language=bash]
+\begin{verbatim}
 # Tous les tests
 ctest --test-dir build --output-on-failure
 
@@ -192,7 +195,7 @@ cmake -B build_tsan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
     -DUSE_OMP=ON -DUSE_TSAN=ON
 cmake --build build_tsan -j
 ctest --test-dir build_tsan --output-on-failure
-\end{lstlisting}
+\end{verbatim}
 
 % =============================================================================
 \section{Lancer les benchmarks}
@@ -201,15 +204,15 @@ ctest --test-dir build_tsan --output-on-failure
 
 \subsection{En local}
 
-\begin{lstlisting}[language=bash]
+\begin{verbatim}
 ./scripts/run_benchmark.sh                    # build + sweep
 python3 scripts/plot_results.py results/benchmark.csv
                                               # produit docs/figures/
-\end{lstlisting}
+\end{verbatim}
 
 \subsection{Sur Romeo}
 
-\begin{lstlisting}[language=bash]
+\begin{verbatim}
 ssh romeo
 cd ~/wfc801
 sbatch scripts/romeo_full_bench.slurm         # 1h, full sweep CPU
@@ -225,4 +228,4 @@ scp romeo:~/wfc801/results/*.csv ./results/
 bash scripts/post_job_pipeline.sh 543692
 # Génère docs/figures/scaling/, docs/figures/amdahl/,
 # results/tables_543692.md, results/insights_543692.md
-\end{lstlisting}
+\end{verbatim}

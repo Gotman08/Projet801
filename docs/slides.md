@@ -285,10 +285,12 @@ fonctionnel ; pour vraiment exploiter GPU, batch processing requis.
 émet un JSON consommé par un plugin UE 5.7.
 
 \begin{itemize}
-\item JSON v1 (mono-étage) ou v2 (multi-étages avec escaliers)
+\item JSON mono-étage (grid + tile\_alphabet + cells + voisins cardinaux)
 \item Flood-fill BFS de connectivité avec re-roll si pièces isolées
-\item Auto-placement d'escaliers entre étages adjacents
-\item Plugin UE 5.7 spawn des \texttt{StaticMeshComponent} par cellule
+\item Plugin UE 5.7 : spawn des \texttt{StaticMeshComponent} par cellule, mesh variants random
+\item Gameplay actors : \texttt{PlayerStart} centré, NPC spawners, pickups (sans recouvrement)
+\item Auto \texttt{NavMeshBoundsVolume} dimensionné sur la grille
+\item Bouton \textit{Generate Random} : spawn \texttt{wfc\_dungeon.exe} en sous-processus, JSON in-editor
 \end{itemize}
 
 . . .

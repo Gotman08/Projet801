@@ -112,11 +112,7 @@ Choix : un seul \texttt{vector<u64>} contigu de taille $r \cdot c \cdot \text{wo
 
 \begin{figure}[H]
 \centering
-\fbox{\parbox{0.9\textwidth}{\centering
-Voir \texttt{schemas/wave\_memory\_layout.md} pour le prompt de génération.\\
-Layout flat de la wave : un seul buffer \texttt{vector<u64>}, indexation \\
-\texttt{(r, c)} → offset \texttt{(r * cols + c) * words\_per\_cell}, BitsetView non-propriétaire.
-}}
+\schemaImage{Layout flat de la Wave avec BitsetView}
 \caption{Wave en mémoire : un seul buffer contigu, partagé par tous les threads, avec accès via BitsetView.}
 \label{fig:wave_layout}
 \end{figure}
@@ -130,7 +126,7 @@ Le constructeur de \texttt{Wave} initialise les cellules en parallèle :
 for (std::ptrdiff_t c = 0; c < total_cells; ++c) {
     const std::size_t base = c * words_per_cell_;
     for (std::size_t w = 0; w + 1 < words_per_cell_; ++w) {
-        words_[base + w] = ~0ULL;  // tous bits set
+        words_[base + w] = 0xFFFFFFFFFFFFFFFFULL;  // tous bits set
     }
     if (words_per_cell_ > 0) {
         words_[base + (words_per_cell_ - 1)] = tail_mask;

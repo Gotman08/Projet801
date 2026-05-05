@@ -43,10 +43,7 @@ Pour $N = 2$, l'extraction non-toroïdale identifie 8 tuiles distinctes ; l'extr
 
 \begin{figure}[H]
 \centering
-\fbox{\parbox{0.9\textwidth}{\centering
-Voir \texttt{schemas/sample\_to\_output.md} pour le prompt de génération.\\
-Échantillon $5 \times 5$ binaire (gauche) → solveur WFC → grille $64 \times 64$ générée (droite).
-}}
+\schemaImage{Pipeline sample WFC vers sortie 64x64}
 \caption{Pipeline WFC en une figure : à partir d'un petit échantillon, le solveur reproduit les motifs locaux dans une grille de taille libre.}
 \label{fig:sample_to_output}
 \end{figure}
@@ -94,7 +91,7 @@ WFC est massivement utilisé pour la génération procédurale de niveaux :
     \item \textbf{Bad North} : génération des îles tactiques.
 \end{itemize}
 
-Notre démonstration UE5 (\texttt{wfc\_dungeon}, voir Chapitre~\ref{chap:extensions}) reproduit ce paradigme : génération d'un dungeon multi-étages exporté en JSON, consommé par un plugin Unreal qui spawne les meshes 3D dans un \texttt{ADungeonGenerator}.
+Notre démonstration UE5 (\texttt{wfc\_dungeon}, voir Chapitre~\ref{chap:extensions}) reproduit ce paradigme : génération d'un dungeon mono-étage exporté en JSON, consommé par un plugin Unreal qui spawne les meshes 3D et des actors gameplay (PlayerStart, NPC spawners, pickups) dans un \texttt{ADungeonGenerator}.
 
 \subsection{Synthèse de textures}
 

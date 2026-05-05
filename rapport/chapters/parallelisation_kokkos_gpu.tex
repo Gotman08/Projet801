@@ -32,11 +32,7 @@ Kokkos abstrait ces différences. Le développeur écrit un \textbf{kernel paral
 
 \begin{figure}[H]
 \centering
-\fbox{\parbox{0.9\textwidth}{\centering
-Voir \texttt{schemas/kokkos\_architecture.md} pour le prompt de génération.\\
-Pipeline Kokkos : Wave \texttt{vector<u64>} → \texttt{Kokkos::View} (HostSpace ou CudaSpace) →
-\texttt{parallel\_for} avec \texttt{PropagateOp} fonctor → atomic ops sur le device → \texttt{deep\_copy} retour si GPU.
-}}
+\schemaImage{Architecture Kokkos avec branche kHostOnly}
 \caption{Architecture Kokkos pour la propagation BFS, avec branche \texttt{kHostOnly} compile-time choisissant zero-copy ou deep\_copy.}
 \label{fig:kokkos_architecture}
 \end{figure}
@@ -118,7 +114,7 @@ struct PropagateOp {
             bool changed = false;
             for (int i = 0; i < W; ++i) {
                 const u64 mask = allowed[i];
-                if (mask == ~0ULL) continue;
+                if (mask == 0xFFFFFFFFFFFFFFFFULL) continue;
                 // Relaxed-load skip (mirror OMP optim)
                 const u64 cur = Kokkos::atomic_load(&wave.words(nc * W + i));
                 if ((cur & ~mask) == 0ULL) continue;
