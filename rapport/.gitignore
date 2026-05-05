@@ -13,3 +13,7 @@ build/
 *.synctex.gz
 *.run.xml
 *.log
+# Beamer
+*.nav
+*.snm
+*.vrb

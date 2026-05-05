@@ -6,6 +6,11 @@ est dans [`README.pdf`](README.pdf).
 
 ## Documentation
 
+Rapport et présentation (LaTeX, à jour) :
+- [`rapport/main.pdf`](rapport/main.pdf) : rapport académique CHPS0801 (99 pages)
+- [`rapport/slides.pdf`](rapport/slides.pdf) : présentation 15 min (25 slides)
+
+Documentation technique :
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) : modules et leurs dépendances
 - [docs/ALGORITHM.md](docs/ALGORITHM.md) : algorithme WFC tel qu'implémenté
 - [docs/CHOICES.md](docs/CHOICES.md) : décisions techniques et raisons
@@ -14,8 +19,6 @@ est dans [`README.pdf`](README.pdf).
 - [docs/PERFORMANCE.md](docs/PERFORMANCE.md) : analyse perf avec données Romeo
 - [docs/results.md](docs/results.md) : galerie d'images générées
 - [docs/benchmark.md](docs/benchmark.md) : analyse de scaling SLURM
-- [docs/report.md](docs/report.md) : rapport académique
-- [docs/slides.md](docs/slides.md) : slides de présentation
 - [docs/ue5_integration.md](docs/ue5_integration.md) : démo Unreal Engine 5 (optionnelle, voir `BUILD_DUNGEON`)
 
 ## Ce que ça fait
@@ -89,8 +92,8 @@ l'interface publique. Activer avec `-DBUILD_DUNGEON=ON` :
 ```bash
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_OMP=ON -DBUILD_DUNGEON=ON
 cmake --build build -j
-./build/wfc_dungeon samples/multivalue_maze.txt --rows 24 --cols 24 \
-    -N 2 --seed 42 --levels 3 -o dungeon.json
+./build/wfc_dungeon samples/rooms.txt --rows 24 --cols 24 \
+    -N 2 --seed 42 --connectivity-attempts 5 -o dungeon.json
 ```
 
 Le pipeline UE5 (asset → JSON → spawn de meshes) est documenté dans
@@ -258,9 +261,12 @@ l'analyse complète.
 ## Rapport et présentation
 
 ```bash
-pandoc docs/report.md  -o docs/report.pdf  --toc --pdf-engine=xelatex
-pandoc -t beamer docs/slides.md -o docs/slides.pdf
+cd rapport
+xelatex main.tex && biber main && xelatex main.tex && xelatex main.tex
+xelatex slides.tex && xelatex slides.tex
 ```
+
+PDF générés : `rapport/main.pdf` (rapport, 99 pages) et `rapport/slides.pdf` (slides, 25 pages).
 
 ## Layout
 
@@ -268,13 +274,15 @@ pandoc -t beamer docs/slides.md -o docs/slides.pdf
 include/wfc/   headers publics (Grid, Tile, Bitset, TileSet, OverlapRules,
                Wave, WFCSolver, GridIO + solvers/)
 src/           implémentations
-apps/          wfc_serial, wfc_omp, wfc_kokkos, benchmark
-tests/         test_grid, test_tileset, test_overlap, test_solver
+apps/          wfc_serial, wfc_omp, wfc_kokkos, benchmark, wfc_dungeon
+tests/         15 suites (test_bitset, test_overlap, test_solver_omp, ...)
 samples/       grilles d'entrée
-scripts/       run_benchmark.sh, plot_results.py, build_kokkos.sh
+scripts/       run_benchmark.sh, plot_results.py, slurm Romeo, build_kokkos.sh
 results/       CSV des benchmarks
-docs/          report.md, slides.md, figures/
+docs/          documentation technique (architecture, build, tests, perf)
+rapport/       rapport LaTeX (main.tex, slides.tex) + figures + schemas
 third_party/   stb_image_write.h
+ue5_plugin/    plugin Unreal Engine 5.7 (WFCDungeon)
 ```
 
 ## Licence
