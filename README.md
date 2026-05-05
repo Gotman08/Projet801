@@ -70,6 +70,17 @@ cmake --build build -j
 
 ## Démo Unreal Engine 5 (optionnel)
 
+| | | |
+|---|---|---|
+| ![](docs/figures/ue5_dungeon_01.png) | ![](docs/figures/ue5_dungeon_02.png) | ![](docs/figures/ue5_dungeon_03.png) |
+
+*Sorties du plugin `WFCDungeon` dans UE 5.7 : grille `samples/rooms.txt`
+24×24 résolue par `wfc_dungeon`, JSON parsé par l'acteur
+`ADungeonGenerator` qui spawn les meshes (sol/mur/porte) cellule par
+cellule, ferme le périmètre via `bWallOnBorders`, scatter les NPC
+spawners et pickups sur les cellules walkable, place 4 PlayerStarts au
+centre et un `NavMeshBoundsVolume` couvrant la map.*
+
 Cible CMake additionnelle `wfc_dungeon` qui génère un JSON pour un
 plugin UE 5.7 (`ue5_plugin/WFCDungeon/`). Ne touche ni au benchmark ni
 aux solveurs parallèles : utilise uniquement `WFCSolverSerial` via
