@@ -42,7 +42,13 @@ Pour $N = 2$, l'extraction non-toroïdale identifie 8 tuiles distinctes ; l'extr
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{results/figures/schemas/sample_to_output.png}
-\caption{Pipeline WFC en une figure : à partir d'un petit échantillon $S$ (5×5), le solveur reproduit les motifs locaux dans une grille $G$ de taille libre (64×64).}
+\caption[Schéma illustratif du pipeline WFC.]{Schéma illustratif du
+pipeline WFC : à partir d'un petit échantillon $S$ (5$\times$5), le
+solveur produit une grille $G$ de taille libre (64$\times$64) dont
+chaque sous-bloc $N \times N$ apparaît dans $S$. La sortie représentée
+ici est purement illustrative ; les vraies sorties de notre solveur
+(binary, terrain, plant, skyline, rooms, dungeon UE5) sont présentées
+au Chapitre~\ref{chap:resultats}, Section~\ref{sec:res:gallery}.}
 \label{fig:sample_to_output}
 \end{figure}
 
