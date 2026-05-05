@@ -184,13 +184,24 @@ struct PropagateOp {
                     }
                 }
 
-                // Apply allowed mask to neighbour with atomic AND.
+                // Apply allowed mask to neighbour with atomic AND. Optim (3):
+                // relaxed read first to skip the atomic when the mask would
+                // be a no-op (`cur & ~mask == 0`). On x86 a Kokkos atomic
+                // AND maps to `lock and` (~80-3000 ns inter-NUMA); the
+                // relaxed load only needs the cache line in shared state.
+                // On CUDA the atomic_fetch_and goes through global atomic
+                // units; the relaxed load checks shared memory first. This
+                // is correctness-preserving (the AND is idempotent and the
+                // race window only loses the chance to skip a pending no-op).
                 const std::size_t nc_off = static_cast<std::size_t>(nc)
                                          * static_cast<std::size_t>(W);
                 bool changed = false;
                 for (int i = 0; i < W; ++i) {
                     const std::uint64_t mask = allowed[i];
                     if (mask == ~0ULL) continue;
+                    const std::uint64_t cur =
+                        Kokkos::atomic_load(&wave.words(nc_off + i));
+                    if ((cur & ~mask) == 0ULL) continue;
                     const std::uint64_t old_val =
                         Kokkos::atomic_fetch_and(&wave.words(nc_off + i), mask);
                     if ((old_val & ~mask) != 0ULL) changed = true;

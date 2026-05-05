@@ -75,16 +75,15 @@ serrés (terrain N=3, maze contraint).
 ### Min-entropy work-density gate (gardée)
 
 `parallel_min_entropy` court-circuite vers `serial_min_entropy` quand
-le travail prévu (`total_cells × num_tiles`) est < 50 000 ops, ou quand
-`max_threads ≤ 1`. Granularité changée de `total/(4×threads)` à
+le travail prévu (`total_cells × num_tiles`) est < 50 000 ops, ou
+quand `max_threads ≤ 1`. Granularité changée de `total/(4×threads)` à
 `total/threads` (1 chunk par thread) : moins de tasks OMP pour un load
 balancing inutile (chunks de coût égal).
 
-`propagate_tasks` ajoute le seuil
-`frontier_size × num_tiles × (2N-1)² ≥ 50 000` au-dessus du
-frontier-size threshold existant. C'est ce seuil qui fait basculer
-smooth_N3 (peu de tuiles + N=3 = peu de parallélisme par cellule) en
-série au-delà de 4 threads.
+Un seuil similaire avait été essayé dans `propagate_tasks` pour le
+plateau smooth_N3 mais rollbacked : il aurait risqué de sérialiser des
+niveaux BFS moyens sur binary_L11 où le peak 5.27× à 8t sur Romeo
+dépend de leur parallélisation.
 
 Activer LTO : `cmake -B build -DUSE_LTO=ON ...`
 

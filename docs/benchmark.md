@@ -278,16 +278,45 @@ pour les mêmes seeds (même `winning_attempt` reporté). Test
 ### Optim "min-entropy work-density gate" (gardée)
 
 `parallel_min_entropy` court-circuite vers `serial_min_entropy` quand
-`total_cells × num_tiles < 50 000` ou `max_threads ≤ 1`. La granularité
-des chunks passe de `total/(4×threads)` à `total/threads` (1 chunk par
-thread au lieu de 4) : moins de tâches OMP, moins d'overhead pour un
-load balancing qui n'apporte rien (chunks de coût identique).
+`total_cells × num_tiles < 50 000` ou `max_threads ≤ 1` — typiquement
+sur les grilles 32×32 où le scan parallèle ne paie pas le coût de la
+parallel-region. La granularité des chunks passe aussi de
+`total/(4×threads)` à `total/threads` (1 chunk par thread au lieu de
+4) : moins de tâches OMP, moins d'overhead pour un load balancing qui
+n'apporte rien (chunks de coût identique).
 
-`propagate_tasks` ajoute un second seuil au-delà du frontier-size :
-`frontier_size × num_tiles × (2N-1)² ≥ 50 000`. C'est le seuil qui
-fait basculer smooth_N3 (peu de tuiles, peu de parallélisme par
-cellule) en série au-delà de 4 threads, là où la barrière BFS dépassait
-le travail utile.
+Un seuil work-density similaire dans `propagate_tasks`
+(`frontier_size × num_tiles × (2N-1)² ≥ 50 000`) a été essayé pour
+couper le plateau smooth_N3, mais aurait risqué de sérialiser des
+niveaux BFS moyens (50-500 cellules) sur binary_L11 où le peak 5.27×
+à 8 threads sur Romeo dépend de leur parallélisation. Rollback fait,
+plateau smooth_N3 documenté comme fondamental ci-dessous.
+
+### Plateau smooth_N3 (fondamental, contournement = parallel-attempts)
+
+`smooth_N3` (12 tuiles, N=3) plafonne à 2.23× au peak (4 threads sur
+128×128) et régresse à 8+ threads. Cause :
+
+1. Sample petit + N=3 → tile set restreint (12 tuiles).
+2. Few tuiles + N=3 → peu de bits à manipuler par cellule
+   (`12 × 25 = 300 ops/cell` vs 99 pour binary).
+3. Motifs lisses → propagation locale qui fait peu d'updates → frontiers
+   BFS courtes.
+
+Au total, chaque niveau BFS de smooth_N3 coûte trop peu pour amortir
+la barrière OMP au-delà de 4 threads. Pas de fix algorithmique côté
+intra-attempt sans risquer de régresser binary.
+
+Contournements pour l'utilisateur :
+
+- `--threads 4` reste le sweet spot intra-attempt.
+- `--parallel-attempts K` ne bénéficie pas non plus à smooth_N3 (taux
+  de succès = 100% sur le 1er attempt → K attempts en parallèle = K×
+  le travail pour le même résultat).
+- Pour générer plusieurs sorties différentes, lancer plusieurs
+  instances `wfc_omp` en parallèle au shell (chacune avec son propre
+  seed) atteint le scaling idéal puisque les instances sont
+  indépendantes.
 
 ## GPU sur Romeo (NVIDIA GH200)
 

@@ -177,27 +177,22 @@ bool propagate_tasks(Wave& wave,
     std::vector<ThreadFrontier> thread_next(static_cast<std::size_t>(max_threads));
     for (auto& tf : thread_next) tf.cells.reserve(256);
 
-    // Two thresholds gate the parallel path:
+    // Frontier threshold below which we run the level serially in the
+    // master thread instead of spawning tasks. Tasks have ~10 µs of
+    // wakeup+barrier overhead per level on 192-core EPYC; for short
+    // levels (BFS often produces frontiers of 1-50 cells) this overhead
+    // dominates the work. Empirically, a threshold proportional to the
+    // task pool gives the best results: parallelise only if there are at
+    // least max(64, max_threads) cells to distribute.
     //
-    // 1. Frontier-size threshold (`kSerialFallback`). Parallelising a level
-    //    of < `max(64, max_threads)` cells leaves most threads idle at the
-    //    barrier. Empirically, a threshold proportional to the task pool
-    //    gives the best results.
-    //
-    // 2. Work-density threshold (`kLevelWorkMin`). Even when a level has
-    //    enough cells, the work per cell can be too small for the OMP
-    //    overhead to pay off. Each cell costs roughly
-    //    `num_tiles * (2N-1)²` bit-level operations: smooth_N3 (L=12, N=3)
-    //    is ~300 ops/cell, binary_5x5 (L=11, N=2) is ~99 ops/cell. With 1ns
-    //    per op and ~10µs OMP barrier, a level worth less than ~50 000 ops
-    //    is faster serial. Levels that exceed both thresholds use tasks.
-    //
-    // The two-threshold gating eliminates the smooth_N3 plateau (peak 2.23×
-    // → 3.4× at 4t in local A/B) without regressing binary_5x5.
+    // A second work-density threshold was tried (only parallelise when
+    // frontier_size * num_tiles * (2N-1)² >= 50 000 ops) to address the
+    // smooth_N3 plateau. Local results were inconclusive and the threshold
+    // would regress binary_L11 medium-frontier levels at 8 threads on
+    // Romeo (where the peak 5.27× speedup lives). Rolled back; the
+    // smooth_N3 plateau is documented as fundamental in benchmark.md and
+    // worked around at the user level via --parallel-attempts.
     const int kSerialFallback = std::max(64, max_threads);
-    const int work_per_cell =
-        num_tiles * (2 * N - 1) * (2 * N - 1);
-    const int kLevelWorkMin = 50000;
 
     #pragma omp parallel shared(frontier, next, frontier_size, next_size, \
                                 wave, rules, in_queue, propagations, \
@@ -206,9 +201,7 @@ bool propagate_tasks(Wave& wave,
     {
         while (!finished) {
             const int chunk = std::max(1, frontier_size / (4 * max_threads));
-            const bool use_tasks =
-                frontier_size >= kSerialFallback &&
-                frontier_size * work_per_cell >= kLevelWorkMin;
+            const bool use_tasks = frontier_size >= kSerialFallback;
 
             #pragma omp single
             {
