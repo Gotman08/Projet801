@@ -1,107 +1,66 @@
 \chapter{Introduction}
 
-\section{Contexte}
+\section{Sujet et stratégie}
 
-La \textbf{génération procédurale} est devenue centrale dans plusieurs domaines : jeux vidéo (Minecraft, No Man's Sky, Townscaper), simulation, graphisme, level design, art génératif. Le défi commun : produire des artefacts variés mais qui suivent une cohérence locale. La grille générée ne doit pas seulement être valide globalement, elle doit \textit{ressembler} localement à un échantillon de référence fourni par le designer.
-
-Parmi les algorithmes répondant à ce besoin, le \textbf{Wave Function Collapse} (WFC), introduit par Maxim Gumin en 2016 \cite{gumin2016wfc}, occupe une place singulière. Inspiré par analogie avec la mécanique quantique (chaque cellule commence en superposition de toutes ses valeurs possibles, puis « se collapse » progressivement), WFC se distingue par sa simplicité conceptuelle : aucun apprentissage automatique, aucun réseau de neurones, juste une heuristique gloutonne combinant entropie minimale et propagation de contraintes.
-
-\subsection{Le problème WFC en une phrase}
-
-À partir d'un échantillon $S$ (grille d'entiers de taille modeste) et d'un paramètre $N$ (taille de tuile), produire une grille $G$ (taille libre) telle que tout sous-bloc $N \times N$ de $G$ apparaisse au moins une fois dans $S$. Si $S$ contient des immeubles avec fenêtres, $G$ produit un skyline cohérent ; si $S$ contient une plante avec fleurs, $G$ produit un jardin de plantes similaires (figure~\ref{fig:wfc_paper_outputs}).
+Le \textbf{Wave Function Collapse} (WFC) en modèle \textit{overlapping} \cite{gumin2016wfc} prend un échantillon $S$ et un paramètre $N$, et produit une grille $G$ telle que tout sous-bloc $N \times N$ de $G$ apparaisse dans $S$. L'algorithme combine deux primitives : \textit{sélection min-entropie} (choisir la cellule la plus contrainte) et \textit{propagation BFS} (intersecter les contraintes des voisins). Il est intrinsèquement séquentiel sur l'arbre de décisions, mais offre du parallélisme \emph{intra-niveau} : le scan d'entropie et la propagation BFS niveau-synchrone se chunkent sur threads.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{results/figures/schemas/wfc_paper_outputs.png}
-\caption{Sorties WFC reproductibles à partir de petits échantillons. Le solveur n'apprend pas une grammaire ni un modèle ; il déduit les contraintes locales par énumération des sous-blocs $N \times N$ de l'échantillon.}
+\caption{Sorties WFC à partir de petits échantillons : skyline urbain, plante, dungeon binaire. Chaque ligne montre l'input à gauche et trois sorties générées avec des seeds différents.}
 \label{fig:wfc_paper_outputs}
 \end{figure}
 
-\subsection{Intérêt du calcul haute performance}
+\subsection{Stratégie d'implémentation}
 
-WFC paraît simple mais sa complexité est conséquente. La phase de \textit{sélection min-entropie} re-scanne la wave entière à chaque collapse, soit $O(\text{rows} \cdot \text{cols} \cdot L)$ pour chaque itération, multiplié par $\sim \text{rows} \cdot \text{cols}$ collapses au total. Sur une grille $256 \times 256$ avec $L = 11$ tuiles, cela représente environ $4.6 \cdot 10^9$ opérations de scan dans la version naïve.
-
-La \textbf{propagation BFS} ajoute un second coût : chaque collapse déclenche une cascade qui peut toucher des milliers de cellules avant de stabiliser. Cette propagation est intrinsèquement séquentielle au sein d'un niveau BFS donné, mais les niveaux successifs offrent du parallélisme exploitables.
-
-Le \textbf{calcul haute performance} (HPC) répond à ce défi en exploitant :
-\begin{itemize}
-    \item le \textbf{parallélisme à mémoire partagée} via OpenMP, en particulier l'API \texttt{\#pragma omp task} explicite recommandée par le sujet ;
-    \item la \textbf{portabilité GPU} via Kokkos \cite{kokkos2014}, framework de l'écosystème DOE qui compile le même code source vers OpenMP, CUDA, HIP, ou SYCL ;
-    \item les \textbf{optimisations bas niveau} : bitsets packés sur \texttt{uint64\_t}, atomics relaxées, alignement cache, NUMA first-touch.
-\end{itemize}
-
-\section{Objectifs du projet}
-
-Le projet poursuit cinq objectifs articulés autour de trois axes principaux.
-
-\subsection{Implémenter trois backends WFC}
-
-Le sujet demande explicitement (i) une version série de référence, (ii) une version parallèle utilisant l'API \texttt{\#pragma omp task} explicite \textbf{ou} Kokkos, et (iii) une extension multi-valeurs. Nous avons choisi d'implémenter \textbf{les trois backends} (série, OpenMP-tasks, Kokkos) afin d'analyser comparativement les paradigmes de parallélisation. Les trois doivent produire un \textbf{output bit-identique} pour un même seed, ce qui impose des contraintes fortes sur le tirage aléatoire et la réduction parallèle.
-
-\subsection{Analyser la performance et la scalabilité}
-
-Le second objectif consiste à évaluer rigoureusement les performances :
-\begin{itemize}
-    \item Mesures de temps d'exécution sur configurations variées (grilles de $32 \times 32$ à $512 \times 512$, $L$ de 11 à 73 tuiles) ;
-    \item Métriques de scalabilité : speedup, efficacité, fit Amdahl ;
-    \item Expérimentations sur le supercalculateur \textbf{Romeo} (Université de Reims Champagne-Ardenne) avec configurations jusqu'à 192 threads OpenMP et un GPU NVIDIA GH200 ;
-    \item Analyse du \textit{varying input dataset} : impact du sample (binaire vs multi-valeurs), du paramètre $N$, et de la taille de sortie.
-\end{itemize}
-
-\subsection{Livrer des extensions opt-in}
-
-Au-delà du sujet, nous avons livré quatre extensions optionnelles, toutes activables sans dégrader le chemin par défaut :
+Trois livrables incrémentaux :
 \begin{enumerate}
-    \item \textbf{Parallel attempts} (\texttt{--parallel-attempts K}) : lance K attempts WFC indépendants en parallèle, garde le succès d'index minimum (déterministe, +2.14× wallclock sur \texttt{terrain N=3}) ;
-    \item \textbf{Symétries D4} (\texttt{--symmetries S}) : étend le tile set par rotations + réflexions (zéro coût si désactivé) ;
-    \item \textbf{Backtracking} (\texttt{--backtrack}) : alternative au restart-on-contradiction, avec snapshot delta-encodé pour minimiser la mémoire ;
-    \item \textbf{Démo Unreal Engine 5} (\texttt{-DBUILD\_DUNGEON=ON}) : CLI \texttt{wfc\_dungeon} qui émet un JSON consommé par un plugin UE 5.7 spawnant des meshes en 3D.
+    \item \textbf{Solveur série} (\texttt{wfc\_serial}) : référence algorithmique, bitsets packés sur \texttt{uint64\_t}, BFS niveau-synchrone, jitter d'entropie déterministe SplitMix64.
+    \item \textbf{Backend OpenMP} (\texttt{wfc\_omp}) : API \texttt{\#pragma omp task} explicite. Sélection min-entropie chunkée + réduction ordonnée. Propagation pilotée par une seule région \texttt{parallel} (les barrières par niveau seraient catastrophiques sur 8000 niveaux BFS).
+    \item \textbf{Backend Kokkos} (\texttt{wfc\_kokkos}) : même code source pour CPU OpenMP et GPU CUDA, branche compile-time \texttt{kHostOnly} pour le zero-copy CPU vs \texttt{deep\_copy} GPU.
 \end{enumerate}
 
-\section{Contributions et organisation du rapport}
+Tous trois produisent un output \textbf{bit-identique} pour un même seed, vérifié par hash SHA-256. Cette contrainte oriente plusieurs choix : RNG stateless, réduction en ordre de chunk fixe, atomics commutatives.
 
-\subsection{Contributions}
+Quatre extensions opt-in : parallel-attempts, symétries D4, backtracking delta-encodé, démo Unreal Engine 5.7.
 
-Les principales contributions de ce travail sont :
+\subsection{Problèmes rencontrés}
 
-\begin{enumerate}
-    \item \textbf{Trois backends bit-identiques} (serial, OpenMP, Kokkos) avec déterminisme garanti par hash SplitMix64 sur \texttt{(cell\_id, seed)} et réduction min-entropie en ordre de chunk fixe ;
-
-    \item \textbf{Refactor Kokkos GPU-portable} : le même code source compile et tourne sur CPU OpenMP et GPU CUDA grâce à une branche \texttt{if constexpr (kHostOnly)} qui choisit zero-copy (CPU) ou \texttt{deep\_copy} (GPU) ;
-
-    \item \textbf{Optimisations OMP A/B-testées} : frontier-threshold (+25\% à 64 threads), relaxed-load atomique (-50\% trafic), LTO (+3.4\%). Plusieurs candidats rejetés (log-cache thread-local, vector FIFO) pour cause de régression ;
-
-    \item \textbf{Trois extensions algorithmiques} (parallel attempts, symétries D4, backtracking) intégrées de façon strictement opt-in : zéro impact mesurable sur le chemin par défaut, vérifié par perf sanity check ;
-
-    \item \textbf{Validation expérimentale étendue} : 220+ runs benchmarkés sur Romeo (jobs SLURM 543692, 544061, 544356, 544361), 99\% de couverture de lignes (gcovr), 24 980 checks d'invariants à travers 15 suites de tests.
-\end{enumerate}
-
-\subsection{Organisation du rapport}
-
-Ce rapport est structuré en douze chapitres, suivis d'annexes techniques :
+Trois difficultés majeures pendant le développement, traitées dans les chapitres correspondants :
 
 \begin{itemize}
-    \item Le \textbf{Chapitre 2} présente les \textit{préliminaires} : complexité, paradigmes de parallélisation (OpenMP, Kokkos), métriques HPC ;
-
-    \item Le \textbf{Chapitre 3} formalise le \textit{problème WFC overlapping} : définitions, propriétés, applications ;
-
-    \item Le \textbf{Chapitre 4} détaille l'\textit{approche algorithmique séquentielle} : extraction toroïdale, compatibilités, entropie de Shannon pondérée, BFS de propagation ;
-
-    \item Le \textbf{Chapitre 5} décrit l'\textit{implémentation C++} et l'ingénierie logicielle : Bitset packé, Wave NUMA-friendly, organisation en libs CMake ;
-
-    \item Le \textbf{Chapitre 6} présente la \textit{parallélisation OpenMP} avec \texttt{\#pragma omp task} explicite et les optimisations gardées ou rejetées en A/B ;
-
-    \item Le \textbf{Chapitre 7} traite de la \textit{parallélisation Kokkos} et du refactor GPU-portable, avec les contraintes spécifiques au backend CUDA ;
-
-    \item Le \textbf{Chapitre 8} décrit les \textit{extensions algorithmiques} (parallel attempts, symétries D4, backtracking) et leur stratégie d'intégration opt-in ;
-
-    \item Le \textbf{Chapitre 9} décrit le \textit{protocole expérimental} et la méthodologie de benchmarking sur Romeo ;
-
-    \item Le \textbf{Chapitre 10} présente les \textit{résultats} et leur analyse : speedup et efficacité, fit Amdahl, varying datasets et configurations ;
-
-    \item Le \textbf{Chapitre 11} discute des \textit{limites et perspectives} : NUMA partitioning, batch GPU, priority queue incrémentale, SIMD bitset ;
-
-    \item Le \textbf{Chapitre 12} dresse le bilan technique du projet (livrables, perf peak, validation).
+    \item \textbf{Régression OMP fork/join} : ouvrir une région \texttt{parallel} par niveau BFS coûte $\sim 50$ µs $\times$ 8000 niveaux $= 400$ ms d'overhead pur, plus que le travail utile. Résolu par une seule région \texttt{parallel} ouverte avec \texttt{single} pilotant les niveaux (Section~\ref{sec:omp:propagate}).
+    \item \textbf{Kokkos finalize crash} : Views cachées dans \texttt{thread\_local} désallouées \emph{après} le \texttt{finalize} de Kokkos. Résolu par \texttt{push\_finalize\_hook} (Section~\ref{sec:kokkos:cleanup}).
+    \item \textbf{GPU plus lent que CPU} : sur GH200, transferts H$\leftrightarrow$D par appel à \texttt{propagate} dominent (16 GB pour 256$\times$256). Documenté comme limite structurelle, pas un bug (Section~\ref{sec:res:kokkos}).
 \end{itemize}
 
-Les \textbf{Annexes} fournissent les détails techniques : commandes de compilation, format CSV des benchmarks, descriptions des samples, et table des optimisations testées.
+\subsection{Analyse de performance}
+
+220+ runs SLURM sur Romeo (EPYC 9654, 192 cœurs, 8 NUMA), avec variation systématique de :
+
+\begin{itemize}
+    \item \textbf{Taille de grille} : 32$\times$32 à 256$\times$256.
+    \item \textbf{Sample (input)} : binary\_L11 (référence), terrain\_L33 (multi-valeurs riche), smooth\_N3 (cas pathologique).
+    \item \textbf{Threads OpenMP} : 1, 2, 4, 8, 16, 32, 64, 192.
+    \item \textbf{Backend} : serial, omp, kokkos (CPU + GPU).
+\end{itemize}
+
+Métriques calculées : speedup, efficacité parallèle, throughput, heatmap taille$\times$threads, fit Amdahl par configuration. Détails Chapitre~\ref{chap:resultats}.
+
+\textbf{Speedup peak observé : 8.23$\times$ à 16 threads sur 256$\times$256 binary\_L11.}
+
+\section{Organisation du rapport}
+
+\begin{itemize}
+    \item Chap.~\ref{chap:preliminaires} : préliminaires (complexité, OpenMP, Kokkos, métriques).
+    \item Chap.~\ref{chap:probleme_wfc} : formalisation du problème WFC overlapping.
+    \item Chap.~\ref{chap:approche} : algorithme séquentiel.
+    \item Chap.~\ref{chap:implementation} : implémentation C++ (Bitset, Wave, CMake).
+    \item Chap.~\ref{chap:openmp} : backend OpenMP, optims A/B.
+    \item Chap.~\ref{chap:kokkos} : backend Kokkos GPU-portable.
+    \item Chap.~\ref{chap:extensions} : extensions opt-in (parallel-attempts, D4, backtrack, UE5).
+    \item Chap.~\ref{chap:protocole} : protocole expérimental.
+    \item Chap.~\ref{chap:resultats} : résultats et analyse (speedup, scaling, Amdahl, varying input/config).
+    \item Chap.~\ref{chap:limites} : limites et pistes (NUMA partitioning, batch GPU, PQ incrémentale).
+    \item Chap.~\ref{chap:conclusion} : bilan.
+\end{itemize}

@@ -86,49 +86,48 @@ Profilage du \texttt{wfc\_serial} sur Romeo, 128×128, $L = 11$ :
 
 \subsection{Speedup binary\_L11 sur Romeo}
 
+La courbe de speedup (Fig.~\ref{fig:speedup_binary}) trace $S(p)$ pour les quatre tailles testées. Toutes les courbes montent jusqu'à un peak situé entre 4 et 16 threads selon la taille, puis chutent : à 256$\times$256, peak 8.23$\times$ à 16 threads ; à 32$\times$32, on n'atteint jamais 1.2$\times$. La forme générale est bien celle prédite par Amdahl complétée par des coûts \emph{supra}-Amdahl (fork/join, contention, frontières BFS) qui dominent au-delà du peak.
+
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{results/figures/scaling/speedup_binary_L11.png}
-\caption{Speedup binary\_L11 Romeo. Plus la grille est grande, plus le speedup peak est élevé.}
+\caption{Speedup binary\_L11. Plus la grille est grande, plus le peak est élevé et plus il se déplace vers la droite.}
 \label{fig:speedup_binary}
 \end{figure}
+
+La bande min/max (Fig.~\ref{fig:speedup_band_binary}) quantifie la variance entre les 3 répétitions de chaque configuration. Lecture pratique : entre 1 et 8 threads, la bande est étroite (régime stable, mesures reproductibles) ; au-delà de 32 threads, la bande s'élargit fortement, les régressions exactes varient d'un run à l'autre.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{results/figures/scaling/speedup_band_binary_L11.png}
-\caption{Bande de speedup binary\_L11 (min/max sur 3 répétitions). La
-zone ombrée encadre la dispersion expérimentale ; on lit directement
-sur le graphe les régions stables (1-8 threads) et instables
-(>32 threads, où la régression varie d'un run à l'autre).}
+\caption{Bande min/max binary\_L11 (3 répétitions). Étroite en régime stable (1-8 threads), large au-delà de 32 threads.}
 \label{fig:speedup_band_binary}
 \end{figure}
+
+L'efficacité parallèle $E(p) = S(p)/p$ (Fig.~\ref{fig:efficiency_binary}) donne une lecture normalisée : à 16 threads sur 256$\times$256 nous sommes à $E = 0.51$ (51\% d'efficacité) ; au-delà de 32 threads, $E$ chute sous 0.1 sur toutes les tailles. Cela quantifie un point important : ce n'est pas un \emph{plateau}, c'est un \emph{décrochage} brutal causé par la barrière par niveau BFS.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{results/figures/scaling/efficiency_binary_L11.png}
-\caption{Efficacité parallèle $E(p) = S(p)/p$ sur binary\_L11. À 16
-threads sur 256×256, $E \approx 0.51$ (51\% d'efficacité). Au-delà
-de 32 threads, l'efficacité s'effondre sous 0.1 quelle que soit la
-taille.}
+\caption{Efficacité parallèle binary\_L11. Décrochage net au-delà de 32 threads, pas un plateau.}
 \label{fig:efficiency_binary}
 \end{figure}
+
+Le throughput (Fig.~\ref{fig:throughput_binary}) inverse la lecture : à taille fixée, l'amortissement parallèle paie quand la grille est grande. Le pic à 15.4 Mcells/s sur 256$\times$256, 16 threads, est $14\times$ supérieur au serial sur la même taille (1.07 Mcells/s, Tab.~\ref{tab:res:serial}). Cela vient en partie du parallélisme et en partie du masquage des latences mémoire (la wave 524 KB déborde de la L2, le parallélisme aide à amortir les latences).
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{results/figures/scaling/throughput_binary_L11.png}
-\caption{Throughput (Mcells/s) binary\_L11. Le throughput maximal est
-atteint à 16 threads sur 256×256 (\textbf{15.4 Mcells/s}), $14\times$
-plus haut que le throughput serial sur la même taille (1.07 Mcells/s).}
+\caption{Throughput binary\_L11. Pic 15.4 Mcells/s à 16 threads sur 256$\times$256 ($14\times$ vs serial).}
 \label{fig:throughput_binary}
 \end{figure}
+
+Le heatmap taille$\times$threads (Fig.~\ref{fig:heatmap_binary}) résume le tout en deux dimensions : la \emph{diagonale} verte (sweet spot) montre que la taille optimale de grille \emph{suit} le nombre de threads. Lecture directe : à 8 threads, optimum vers 128$\times$128 ; à 16 threads, optimum vers 256$\times$256 ; à 32+ threads, le sweet spot sort de la zone mesurée (les runs 512$\times$512 ont timeout à 4h sur Romeo).
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{results/figures/scaling/heatmap_binary_L11.png}
-\caption{Heatmap speedup binary\_L11 (taille × threads). La diagonale
-verte (sweet spot) montre clairement que la taille optimale de grille
-suit le nombre de threads : pour 192 cores, il faudrait probablement
-une grille bien plus grande que 256×256 pour amortir la fork/join.}
+\caption{Heatmap binary\_L11 (taille $\times$ threads, couleur = temps). Le sweet spot diagonal indique que la taille optimale suit le nombre de threads.}
 \label{fig:heatmap_binary}
 \end{figure}
 
@@ -177,7 +176,11 @@ L'optim « frontier-threshold » (Section~\ref{sec:res:optim_frontier}) atténue
 \label{sec:res:amdahl}
 % =============================================================================
 
+Pour caractériser le scaling, nous fittons Amdahl $S(p) = 1 / ((1-f) + f/p)$ par moindres carrés non-linéaires sur la portion croissante de chaque courbe (avant le décrochage). Le fit retourne $f$ (fraction parallélisable) et le ceiling théorique $S_\infty = 1/(1-f)$. Les courbes sont en échelle log-log avec la droite « idéale » $S = p$ pour repère.
+
 \subsection{Évolution du fit avec la taille de grille}
+
+La mosaïque (Fig.~\ref{fig:amdahl_binary_grid}) trace les 4 fits binary\_L11 pour les 4 tailles testées. La fraction parallélisable $f$ croît brutalement avec la taille : 0.18 (32$\times$32) $\to$ 0.74 (64$\times$64) $\to$ 0.93 (128$\times$128) $\to$ 0.94 (256$\times$256). Lecture algorithmique : les coûts fixes (extraction tuiles, init wave, fork/join initial) deviennent rapidement négligeables face au travail utile dès que la grille dépasse 64$\times$64.
 
 \begin{figure}[H]
 \centering
@@ -215,19 +218,20 @@ dominent face aux coûts fixes.}
 
 \subsection{Effet de l'optim « frontier-threshold » sur Amdahl}
 
+Re-fitter Amdahl après activation de l'optim frontier-threshold (Fig.~\ref{fig:amdahl_binary_optim}) déplace les paramètres du modèle : $f$ passe de 0.928 à 0.956, le ceiling théorique de $13.8\times$ à $22.9\times$. Le peak observé monte de $5.27\times$ à $6.10\times$ : l'optim ne ferme pas l'écart au ceiling (les coûts supra-Amdahl restent), mais elle pousse le mur plus loin.
+
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{results/figures/amdahl/amdahl_binary_optim_128.png}
 \caption[Fit Amdahl binary 128 après optim frontier-threshold.]{Fit
-Amdahl binary\_L11 128×128 \textbf{après} activation de l'optim
-frontier-threshold. $f$ passe de 0.928 à 0.956, ceiling de
-$13.8\times$ à $22.9\times$. Le peak observé monte de $5.27\times$ à
-$6.10\times$ : l'optim ne suffit pas à atteindre le nouveau ceiling
-(coûts supra-Amdahl), mais elle pousse le mur.}
+Amdahl binary\_L11 128×128 après frontier-threshold. $f$ passe de
+0.928 à 0.956, ceiling de $13.8\times$ à $22.9\times$.}
 \label{fig:amdahl_binary_optim}
 \end{figure}
 
 \subsection{Amdahl sur autres samples}
+
+La mosaïque par sample (Fig.~\ref{fig:amdahl_other_samples}) compare terrain\_L33 et smooth\_N3 sur 3 tailles. terrain\_L33 suit le même pattern que binary\_L11 (croissance régulière de $f$ avec la taille). smooth\_N3 plafonne à $f = 0.74$ même à 128$\times$128 : peu de tuiles ($L=12$) combiné à $N=3$ produit des frontières BFS courtes qui propagent peu, donc peu de parallélisme exploitable. C'est une limite \emph{structurelle} du sample, pas une marge d'optimisation.
 
 \begin{figure}[H]
 \centering
@@ -310,12 +314,16 @@ smooth\_N3 & 128 & 0.735 & 1.000 & 3.8× & 2.23× & 59\% \\
 
 \subsection{terrain\_L33 vs binary\_L11}
 
+terrain\_L33 (33 tuiles, $N=2$) scale mieux que binary\_L11 à taille égale. Sur 128$\times$128 (Fig.~\ref{fig:speedup_terrain}), le peak est 5.69$\times$ à 8 threads contre 5.27$\times$ pour binary\_L11. La différence vient du travail par cellule : 33 bits à manipuler par cellule vs 11, donc plus d'opérations utiles à amortir, et l'overhead OMP relatif diminue.
+
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{results/figures/scaling/speedup_terrain_L33.png}
-\caption{terrain\_L33 scale mieux que binary\_L11 à taille égale.}
+\caption{Speedup terrain\_L33. Peak 5.69$\times$ à 8 threads sur 128$\times$128.}
 \label{fig:speedup_terrain}
 \end{figure}
+
+L'efficacité et le throughput (Fig.~\ref{fig:scaling_terrain_combo}) confirment : à 8 threads sur 128$\times$128, $E \approx 0.71$ (71\% d'efficacité, vs 65\% pour binary à la même configuration). Le décrochage post-peak est aussi moins brutal, la bande min/max (Fig.~\ref{fig:speedup_band_terrain}) reste étroite jusqu'à 16 threads.
 
 \begin{figure}[H]
 \centering
@@ -330,28 +338,23 @@ smooth\_N3 & 128 & 0.735 & 1.000 & 3.8× & 2.23× & 59\% \\
 \caption{Throughput terrain\_L33.}
 \end{subfigure}
 
-\caption{terrain\_L33 : efficacité et throughput. À 128×128 et 8
-threads, $E \approx 71\%$ — meilleur que binary\_L11 à taille
-identique grâce au travail par cellule plus dense ($L = 33$ bits à
-manipuler vs 11).}
+\caption{terrain\_L33 efficacité + throughput. À 128$\times$128 et 8 threads, $E \approx 0.71$ (vs 0.65 pour binary\_L11).}
 \label{fig:scaling_terrain_combo}
 \end{figure}
+
+Le heatmap terrain\_L33 (Fig.~\ref{fig:heatmap_terrain}) montre un sweet spot diagonal plus large que pour binary\_L11 : la plage de configurations exploitables est plus tolérante au choix taille$\times$threads.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{results/figures/scaling/heatmap_terrain_L33.png}
-\caption{Heatmap terrain\_L33. Le sweet spot diagonal est plus
-prononcé que pour binary\_L11 : la pente d'optimum entre taille et
-threads est plus douce.}
+\caption{Heatmap terrain\_L33. Sweet spot diagonal plus large que binary\_L11.}
 \label{fig:heatmap_terrain}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{results/figures/scaling/speedup_band_terrain_L33.png}
-\caption{Bande min/max terrain\_L33. La dispersion expérimentale
-reste basse jusqu'à 16 threads (régime stable), puis explose au-delà
-(la régression varie d'une exécution à l'autre).}
+\caption{Bande min/max terrain\_L33. Étroite jusqu'à 16 threads.}
 \label{fig:speedup_band_terrain}
 \end{figure}
 
@@ -371,19 +374,23 @@ terrain\_L33 128×128 & 33 & 1.00× & 3.43× & \textbf{5.69×} & 4.81× & 2.13×
 
 \subsection{smooth\_N3, le cas pathologique}
 
+smooth\_N3 (12 tuiles, $N=3$, gradients lisses) plafonne à 2.23$\times$ à 4 threads sur 128$\times$128 (Fig.~\ref{fig:speedup_smooth}) et régresse dès 8 threads. Cause : les motifs lisses produisent des frontières BFS très courtes (peu de cellules touchées par niveau). Combiné à 12 tuiles seulement, le travail par niveau est insuffisant pour amortir les barrières OMP au-delà de 4 threads.
+
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{results/figures/scaling/speedup_smooth_N3.png}
-\caption{smooth\_N3 scale beaucoup moins bien : peu de tuiles + $N = 3$ = peu de parallélisme par cellule.}
+\caption{Speedup smooth\_N3. Peak 2.23$\times$ à 4 threads, régression dès 8.}
 \label{fig:speedup_smooth}
 \end{figure}
+
+L'efficacité et le throughput (Fig.~\ref{fig:scaling_smooth_combo}) confirment : plateau à 4 threads, puis décrochage. Le heatmap (Fig.~\ref{fig:heatmap_smooth}) montre un sweet spot étroit autour de 4 threads, indépendant de la taille de grille — c'est une borne \emph{structurelle} du sample, pas un paramètre à optimiser.
 
 \begin{figure}[H]
 \centering
 \begin{subfigure}[t]{0.48\linewidth}
 \centering
 \includegraphics[width=\linewidth]{results/figures/scaling/efficiency_smooth_N3.png}
-\caption{Efficacité parallèle smooth\_N3.}
+\caption{Efficacité smooth\_N3.}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.48\linewidth}
 \centering
@@ -391,27 +398,21 @@ terrain\_L33 128×128 & 33 & 1.00× & 3.43× & \textbf{5.69×} & 4.81× & 2.13×
 \caption{Throughput smooth\_N3.}
 \end{subfigure}
 
-\caption{smooth\_N3 : efficacité et throughput plafonnent rapidement.
-Le plateau visible à 4 threads sur l'efficacité confirme l'analyse :
-au-delà, les barrières BFS dominent.}
+\caption{smooth\_N3 efficacité + throughput. Plateau à 4 threads, décrochage au-delà.}
 \label{fig:scaling_smooth_combo}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{results/figures/scaling/heatmap_smooth_N3.png}
-\caption{Heatmap smooth\_N3. Sweet spot très étroit autour de
-4 threads, quel que soit la taille — comportement borné par la
-structure du sample, pas par la grille.}
+\caption{Heatmap smooth\_N3. Sweet spot étroit autour de 4 threads, indépendant de la taille.}
 \label{fig:heatmap_smooth}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{results/figures/scaling/speedup_band_smooth_N3.png}
-\caption{Bande min/max smooth\_N3. La bande s'élargit tôt (dès
-8 threads) : la variance entre runs croît rapidement quand on dépasse
-le sweet spot.}
+\caption{Bande min/max smooth\_N3. Élargissement dès 8 threads : variance forte hors du sweet spot.}
 \label{fig:speedup_band_smooth}
 \end{figure}
 
@@ -587,6 +588,8 @@ L'overhead Kokkos par rapport à OpenMP brut est $\sim 30\%$ sur ces workloads, 
 
 \subsection{Comparaison directe serial / OMP / Kokkos}
 
+La mosaïque (Fig.~\ref{fig:backends_binary}) trace les trois backends sur les 4 tailles binary\_L11. À 32$\times$32, Kokkos suit la baseline plate (overhead Views et dispatch dominent le travail). À 256$\times$256, Kokkos converge vers OMP : le travail utile par appel à \texttt{parallel\_for} masque l'overhead. OMP reste meilleur à toutes les tailles à thread count optimal — c'est le coût de la portabilité (avoir un seul code source qui tourne aussi sur GPU CUDA).
+
 \begin{figure}[H]
 \centering
 \begin{subfigure}[t]{0.48\linewidth}
@@ -613,12 +616,11 @@ L'overhead Kokkos par rapport à OpenMP brut est $\sim 30\%$ sur ces workloads, 
 \caption{binary\_L11 256×256.}
 \end{subfigure}
 
-\caption{Comparaison directe serial / OMP / Kokkos sur binary\_L11
-pour 4 tailles. Kokkos suit OMP de loin sur les petites grilles
-(overhead Views + dispatch) et se rapproche de OMP à 256×256 où le
-travail amortit l'overhead.}
+\caption{Backends serial / OMP / Kokkos sur binary\_L11, 4 tailles.}
 \label{fig:backends_binary}
 \end{figure}
+
+Sur les autres samples (Fig.~\ref{fig:backends_other}), le pattern dépend de la quantité de parallélisme exploitable. Sur terrain\_L33, Kokkos bénéficie davantage de la parallélisation à mesure que la grille grandit (le travail par cellule plus dense amortit l'overhead). Sur smooth\_N3, Kokkos colle au serial à toutes les tailles : pas assez de parallélisme exploitable, l'overhead Kokkos n'est jamais amorti.
 
 \begin{figure}[H]
 \centering
@@ -656,21 +658,16 @@ travail amortit l'overhead.}
 \caption{smooth 128×128.}
 \end{subfigure}
 
-\caption[Backends sur terrain et smooth pour 3 tailles.]{Backends
-sur \texttt{terrain\_L33} et \texttt{smooth\_N3}, 3 tailles. Sur
-smooth\_N3, Kokkos suit serial très près à toutes les tailles : peu
-de parallélisme exploitable. Sur terrain\_L33, Kokkos bénéficie
-davantage de la parallélisation à mesure que la grille grandit.}
+\caption[Backends sur terrain et smooth pour 3 tailles.]{Backends sur terrain\_L33 et smooth\_N3, 3 tailles.}
 \label{fig:backends_other}
 \end{figure}
+
+L'effet de l'optim frontier-threshold sur les backends est visible Fig.~\ref{fig:backends_binary_optim} : le delta entre Kokkos et OMP se réduit en régime optimisé. L'optim profite aux deux backends, mais OMP absorbe mieux le gain à haut thread count grâce à un dispatch plus léger.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{results/figures/scaling/backends_binary_optim_128.png}
-\caption{binary\_L11 128×128 \textbf{après} optim frontier-threshold.
-Le delta entre Kokkos et OMP se réduit visiblement sous le régime
-optimisé : l'optim profite aux deux backends, mais OMP en absorbe
-mieux le gain à haut thread count.}
+\caption{binary\_L11 128×128 après optim frontier-threshold. Delta Kokkos/OMP réduit en régime optimisé.}
 \label{fig:backends_binary_optim}
 \end{figure}
 
