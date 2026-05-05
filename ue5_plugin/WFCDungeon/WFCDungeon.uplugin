@@ -1,0 +1,24 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0.0",
+	"FriendlyName": "WFC Dungeon",
+	"Description": "Spawns a 2.5D dungeon from a JSON file produced by the WFC C++ generator. Maps tile ids to user-supplied StaticMeshes via a DataAsset, with auto wall/corner placement based on cardinal neighbours.",
+	"Category": "Procedural",
+	"CreatedBy": "Nicolas Marano",
+	"CreatedByURL": "https://github.com/Gotman08/Projet801",
+	"DocsURL": "https://github.com/Gotman08/Projet801/blob/main/docs/ue5_integration.md",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "WFCDungeon",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}

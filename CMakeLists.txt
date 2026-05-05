@@ -14,6 +14,12 @@ option(USE_OMP "Build the OpenMP-parallel solver" ON)
 option(USE_KOKKOS "Build the Kokkos-parallel solver" OFF)
 option(BUILD_TESTING "Build unit tests" ON)
 
+# Optional UE5-facing dungeon CLI. Off by default so the HPC build pipeline
+# (serial / OMP / Kokkos benchmarks) is unaffected. The dungeon target uses
+# only WFCSolverSerial via the public solver interface — no impact on the
+# parallel hot path. See docs/ue5_integration.md.
+option(BUILD_DUNGEON "Build the wfc_dungeon CLI for the UE5 plugin" OFF)
+
 # Link-Time Optimization. Verified +3.9% speedup vs no-LTO on the binary
 # 128x128 N=2 workload (median of 11 alternating runs). Doubles link time
 # from ~1s to ~3s. Off by default to keep the dev edit-build-test loop
@@ -78,6 +84,14 @@ endif()
 
 add_executable(wfc_serial apps/wfc_serial.cpp)
 target_link_libraries(wfc_serial PRIVATE wfc_core)
+
+# Optional UE5 demo target. Strictly additive: skipped by default, never
+# linked into the benchmark or test suites. Built only when the user
+# explicitly requests -DBUILD_DUNGEON=ON.
+if(BUILD_DUNGEON)
+  add_executable(wfc_dungeon apps/wfc_dungeon.cpp)
+  target_link_libraries(wfc_dungeon PRIVATE wfc_core)
+endif()
 
 if(USE_OMP)
   find_package(OpenMP REQUIRED)

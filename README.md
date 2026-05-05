@@ -16,6 +16,7 @@ est dans [`README.pdf`](README.pdf).
 - [docs/benchmark.md](docs/benchmark.md) — analyse de scaling SLURM
 - [docs/report.md](docs/report.md) — rapport académique
 - [docs/slides.md](docs/slides.md) — slides de présentation
+- [docs/ue5_integration.md](docs/ue5_integration.md) — démo Unreal Engine 5 (optionnelle, voir `BUILD_DUNGEON`)
 
 ## Ce que ça fait
 
@@ -50,6 +51,25 @@ cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_OMP=ON -DUSE_KOKKOS=ON 
       -DKokkos_ROOT=$PWD/external/kokkos/install
 cmake --build build -j
 ```
+
+## Démo Unreal Engine 5 (optionnel)
+
+Cible CMake additionnelle `wfc_dungeon` qui génère un JSON pour un
+plugin UE 5.7 (`ue5_plugin/WFCDungeon/`). Ne touche ni au benchmark ni
+aux solveurs parallèles — utilise uniquement `WFCSolverSerial` via
+l'interface publique. Activer avec `-DBUILD_DUNGEON=ON` :
+
+```bash
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_OMP=ON -DBUILD_DUNGEON=ON
+cmake --build build -j
+./build/wfc_dungeon samples/multivalue_maze.txt --rows 24 --cols 24 \
+    -N 2 --seed 42 --levels 3 -o dungeon.json
+```
+
+Le pipeline UE5 (asset → JSON → spawn de meshes) est documenté dans
+[docs/ue5_integration.md](docs/ue5_integration.md). Sans
+`-DBUILD_DUNGEON=ON`, la cible n'est pas générée et le build reste
+identique au pipeline HPC.
 
 ## Tests
 
