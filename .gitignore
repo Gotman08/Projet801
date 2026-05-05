@@ -57,6 +57,8 @@ results/romeo/romeo_*.err
 results/romeo/romeo_*.out
 results/romeo/romeo_smoke_*.err
 results/romeo/romeo_smoke_*.out
+results/romeo_*.err
+results/romeo_*.out
 
 # OS junk
 .DS_Store

@@ -180,6 +180,43 @@ dérivé par `attempt_seed(base_seed, attempt - 1)`. Jusqu'à
 Si tous les essais échouent, on retourne une grille vide (toutes
 zéros) et `stats.success = false`.
 
+## Parallel attempts
+
+`SolverOptions::parallel_attempts = K > 1` change le retry séquentiel
+en orchestration parallèle :
+
+```
+For batch_start in 0, K, 2K, ... < max_attempts:
+   batch_size = min(K, max_attempts - batch_start)
+   #pragma omp parallel for num_threads(batch_size)
+   for k in 0..batch_size:
+      seed = attempt_seed(base_seed, batch_start + k)
+      success[k] = serial_run_attempt(waves[k], ...)
+   picked = first k where success[k] is true (lowest index)
+   if picked >= 0: return waves[picked]
+```
+
+Détails :
+
+- Chaque attempt utilise `serial_run_attempt` (de SolverCommon),
+  jamais le `propagate` du backend → pas d'oversubscription quand
+  l'utilisateur demande `WFCSolverOMP` avec K > 1.
+- *Cooperative bail-out* : si l'attempt `j` réussit, les attempts
+  `k > j` qui n'ont pas encore commencé skipent leur travail (ils
+  perdraient face à `j` de toute façon). Les attempts `k < j` qui
+  tournent encore continuent — l'un d'eux pourrait gagner avec un
+  index plus bas.
+- Déterminisme préservé : même seed → même sortie qu'un retry
+  séquentiel. Le succès d'index minimum d'un batch est exactement ce
+  qu'un retry séquentiel aurait choisi (les attempts d'index
+  inférieurs auraient échoué avant).
+
+Quand l'utiliser : workloads à fort taux d'échec par attempt (ex.
+`terrain_N3` 24×24 ~10% de succès, gain wallclock 2.14× à K=8 sur
+i9-10900K). Inutile sur les workloads qui réussissent du premier
+coup — K attempts en parallèle = K× le travail pour le même
+résultat.
+
 ## Complexité
 
 | Étape                | Complexité                                | Pour 128×128, L=11    |

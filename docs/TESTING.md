@@ -8,10 +8,11 @@ Liste explicite des invariants vérifiés et de ce qui n'est pas couvert.
 ctest --test-dir build --output-on-failure
 ```
 
-Sans Kokkos : 10 suites (`test_bitset`, `test_grid`, `test_grid_io`,
+Sans Kokkos : 11 suites (`test_bitset`, `test_grid`, `test_grid_io`,
 `test_tileset`, `test_overlap`, `test_wave`, `test_solver_common`,
-`test_solver`, `test_edge_cases`, `test_solver_omp`).
-Avec `-DUSE_KOKKOS=ON` : 12 suites (ajoute `test_solver_kokkos` et
+`test_solver`, `test_edge_cases`, `test_parallel_attempts`,
+`test_solver_omp`).
+Avec `-DUSE_KOKKOS=ON` : 13 suites (ajoute `test_solver_kokkos` et
 `test_kokkos_autoinit`).
 
 Chaque suite est un binaire indépendant ; chacun rapporte
@@ -30,10 +31,11 @@ Chaque suite est un binaire indépendant ; chacun rapporte
 | `test_solver_common`    |  9 060  | entropy, weighted_pick (incl. zero-weight), jitter, build_output deterministic |
 | `test_solver`           |     71  | end-to-end serial : déterminisme + soundness     |
 | `test_edge_cases`       |    404  | failure paths, scale<1, validate, garbage parsing, stb png failure, retry exhaustion |
+| `test_parallel_attempts` |    10  | parallel_attempts validation, déterminisme lowest-success, retry boost terrain N=3, parité OMP/serial à K>1 |
 | `test_solver_omp`       |     33  | déterminisme OMP avec success checks bilatéraux, contradiction, multivalue |
 | `test_solver_kokkos`    |     22  | déterminisme Kokkos avec success checks bilatéraux, contradiction, multivalue |
 | `test_kokkos_autoinit`  |      3  | chemin auto-init/finalize de Kokkos             |
-| **TOTAL**               | **24 375** | |
+| TOTAL                   | 24 385  | |
 
 ## Couverture (gcovr 8.6, build_cov)
 
@@ -46,7 +48,7 @@ python -m gcovr --root . --filter "include/wfc/" --filter "src/" \
     --html-details docs/coverage/index.html build_cov
 ```
 
-Snapshot de couverture (**99% lines, 745 / 751**) :
+Snapshot de couverture (99% lines, 925 / 933) :
 
 | Module                           | Couverture | Manquant                                      |
 |----------------------------------|------------|------------------------------------------------|
@@ -57,24 +59,30 @@ Snapshot de couverture (**99% lines, 745 / 751**) :
 | `include/wfc/TileSet.hpp`        | 100%       |                                                |
 | `include/wfc/OverlapRules.hpp`   | 100%       |                                                |
 | `include/wfc/internal/SolverCommon.hpp` | 100% |                                                |
+| `include/wfc/internal/WFCSolverBase.hpp` | 100% |                                               |
 | `include/wfc/WFCSolver.hpp`      | 100%       |                                                |
 | `src/TileSet.cpp`                | 100%       |                                                |
+| `src/GridIO.cpp`                 | 100%       |                                                |
 | `src/solvers/WFCSolverSerial.cpp`| 100%       |                                                |
 | `src/solvers/WFCSolverOMP.cpp`   | 100%       |                                                |
-| `src/solvers/WFCSolverKokkos.cpp`| **100%**   |                                                |
-| `src/GridIO.cpp`                 | **100%**   |                                                |
-| `src/internal/SolverCommon.cpp`  | 97%        | accolade fermante `build_output`               |
-| `src/internal/WFCSolverBase.cpp` | 91%        | `std::chrono::duration<double>` constructor lines (gcov noise) |
+| `src/solvers/WFCSolverKokkos.cpp`| 99%        | exception path `MAX_WORDS_PER_CELL > 8`        |
+| `src/internal/SolverCommon.cpp`  | 98%        | accolade fermante `build_output`               |
+| `src/internal/WFCSolverBase.cpp` | 94%        | branche all-attempts-failed dans `solve_parallel` + chrono lines (gcov noise) |
 | `src/OverlapRules.cpp`           | 95%        | accolade fermante `build`                      |
-| **TOTAL**                        | **99%**    |                                                |
+| TOTAL                            | 99%        | 8 lignes non couvertes / 933                   |
 
-Les 5 lignes manquantes sont **toutes des artefacts gcov** :
+Les 8 lignes manquantes restantes :
 - 2 accolades fermantes (line counters sur `}` à la fin de fonctions)
-- 3 lignes splittées de constructeurs `std::chrono::duration<double>(...)`
+- 2 lignes splittées de constructeurs `std::chrono::duration<double>(...)`
   inline (gcov tracke les destructeurs de temporaires sur la même ligne
   source mais ne valide pas toujours leur exécution)
+- 2 lignes de la branche "tous les batches ont échoué" dans
+  `solve_parallel` (les workloads de test sont assez tolérants pour ne
+  jamais épuiser tous les batches en parallel-attempts mode)
+- 2 lignes de l'exception `MAX_WORDS_PER_CELL > 8` dans
+  `WFCSolverKokkos::propagate` (aucun sample n'a > 512 tuiles)
 
-Aucune ligne **fonctionnelle** non testée.
+Toutes les lignes fonctionnelles testables sont couvertes.
 
 ## Framework
 
@@ -223,6 +231,17 @@ ajoute un fichier `tests/test_xxx.cpp`, on l'enregistre dans
 | OMP avec 1, 2, 4, 8 threads = serial bit-à-bit            | OK      |
 | Reseed produit sortie différente                          | OK      |
 | Multivalue : OMP = serial                                  | OK      |
+
+### Parallel attempts ([test_parallel_attempts](../tests/test_parallel_attempts.cpp))
+
+| Invariant                                                | Vérifié |
+|----------------------------------------------------------|---------|
+| `parallel_attempts < 1` → `validate()` throw              | OK      |
+| K=4 sur sample facile : sortie = sequential même seed     | OK      |
+| K=8 sur sample facile : `attempts == 1` (lowest-success)  | OK      |
+| K=8 sur terrain N=3 : orchestration ne crashe pas         | OK      |
+| OMP backend avec K=4 = serial backend avec K=4 bit-à-bit  | OK      |
+| OMP backend K=1 retombe sur le chemin séquentiel legacy   | OK      |
 
 ### Solveur Kokkos ([test_solver_kokkos](../tests/test_solver_kokkos.cpp))
 

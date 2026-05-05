@@ -337,16 +337,16 @@ Le GPU est **plus lent** que le CPU à toutes les tailles testées. À
 
 Pourquoi ce résultat décevant :
 
-1. **H↔D copies par propagate**. `WFCSolverBase` appelle `propagate`
+1. H↔D copies par propagate : `WFCSolverBase` appelle `propagate`
    ~8000 fois par solve. Chaque appel sync host wave → device + device
    → host. Pour 256×256 c'est 524 KB par sens × 16000 = 16 GB de
-   transfert PCIe. À 25 GB/s c'est 0.6 s rien que de transferts.
-2. **Pas assez de parallélisme par niveau BFS**. Un niveau de 100
+   transfert PCIe. À 25 GB/s, 0.6 s rien que de transferts.
+2. Pas assez de parallélisme par niveau BFS : un niveau de 100
    cellules sur une GH200 (16 896 cores CUDA) = 99% des cores oisifs.
-3. **Atomic contention sur unités globales du GPU**. Les
+3. Atomic contention sur unités globales du GPU : les
    `Kokkos::atomic_fetch_and` sur GPU passent par les unités atomiques
-   globales — bien plus lent que les atomics CPU sur cache local.
-4. **Min-entropie reste sur CPU**. La phase qui domine (~85% du temps
+   globales, bien plus lent que les atomics CPU sur cache local.
+4. Min-entropie reste sur CPU : la phase qui domine (~85% du temps
    en serial) ne profite pas du GPU.
 
 Pour vraiment exploiter GPU, il faudrait un changement algorithmique :

@@ -99,12 +99,21 @@ loop:
    wave[cell].set_only(tile)
    if !propagate(cell): contradiction → fail attempt
 ```
-La méthode publique `solve()` enchaîne `max_attempts` tentatives avec
-des seeds dérivés (`attempt_seed`).
+
+`solve()` dispatche selon `SolverOptions::parallel_attempts` :
+
+- `parallel_attempts == 1` (défaut) : `solve_sequential` enchaîne
+  `max_attempts` tentatives séquentielles avec des seeds dérivés
+  (`attempt_seed`). Chemin historique.
+- `parallel_attempts > 1` : `solve_parallel` lance K tentatives WFC
+  *indépendantes* en parallèle (chacune sur son propre `Wave`, avec
+  `serial_run_attempt` de SolverCommon — pas le `propagate` du backend,
+  pour éviter l'oversubscription). Le succès d'index minimum gagne
+  (sortie identique à un retry séquentiel).
 
 Les solveurs concrets surchargent `pick_cell` et `propagate`. Tout le
-reste (init wave, tirage pondéré, mesure de stats, build_output) est
-factorisé.
+reste (init wave, tirage pondéré, mesure de stats, build_output,
+orchestration parallel-attempts) est factorisé.
 
 ### `SolverCommon` ([include/wfc/internal/SolverCommon.hpp](../include/wfc/internal/SolverCommon.hpp))
 Helpers purs partagés entre tous les backends :
@@ -113,6 +122,8 @@ Helpers purs partagés entre tous les backends :
 - `cell_jitter(cell, seed)` — bruit déterministe pour départager les égalités
 - `attempt_seed(base, n)` — dérive le seed de la n-ième tentative
 - `serial_min_entropy(wave, freq, seed)` — scan séquentiel (utilisé par Serial et Kokkos)
+- `serial_propagate(wave, rules, start, &props)` — BFS séquentiel
+- `serial_run_attempt(wave, tiles, rules, seed, rng, stats)` — pick → collapse → propagate sériel complet, utilisé par l'orchestrateur parallel-attempts
 - `build_output(wave, tiles)` — reconstruit la grille finale
 
 ### `WFCSolverSerial` ([src/solvers/WFCSolverSerial.cpp](../src/solvers/WFCSolverSerial.cpp))
@@ -136,11 +147,27 @@ Optimisations spécifiques :
   les écritures concurrentes des voisins)
 - skip relaxed-load avant `lock and` (réduit ~50% du trafic atomique)
 - per-thread frontier buffer (`ThreadFrontier`), agrégé en fin de niveau
+- `kSerialFallback = max(64, max_threads)` : niveaux BFS courts sont
+  traités en série (atténue régression à haut thread count)
+- `parallel_min_entropy` court-circuite vers `serial_min_entropy` quand
+  `total*num_tiles < 50k` ou `max_threads <= 1`
 
 ### `WFCSolverKokkos` ([src/solvers/WFCSolverKokkos.cpp](../src/solvers/WFCSolverKokkos.cpp))
 Variante Kokkos. `Kokkos::parallel_for` sur la frontière BFS,
 `Kokkos::atomic_fetch_and` pour les écritures, même structure que OMP
 mais sans tasks (Kokkos privilégie le data-parallelism).
+
+GPU-portable : la wave est placée dans une `Kokkos::View<u64*>` qui peut
+vivre sur HostSpace ou CudaSpace selon la build. Sur HostSpace,
+`UnmanagedView` enveloppe le buffer existant de Wave (zero-copy) ;
+sur CudaSpace, deep_copy host↔device en début/fin de propagate. Stack
+arrays `MAX_WORDS_PER_CELL = 8` pour éviter toute allocation heap dans
+le kernel (requirement GPU). Optimisations propagées d'OMP : snapshot,
+mask all-ones skip, relaxed-load avant atomic, CAS dedup.
+
+`Kokkos::push_finalize_hook` clear les caches statiques avant
+finalize() pour éviter les "View deallocated after finalize" lors du
+shutdown.
 
 ## Conventions de code
 

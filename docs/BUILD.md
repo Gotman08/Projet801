@@ -7,9 +7,9 @@ tableau ci-dessous puis la section correspondante.
 
 | Plateforme              | Compilateur     | OpenMP | Kokkos | Tests | Notes                              |
 |-------------------------|-----------------|--------|--------|-------|------------------------------------|
-| Ubuntu 24.04 / WSL2     | g++ 13.3        | 4.5    | OK     | 8/8   | machine de développement principale |
-| Windows 11 (MinGW UCRT) | g++ 16.1        | 5.2    | OK     | 8/8   | via MSYS2, voir section Windows    |
-| Romeo (RHEL 9)          | g++ 14.2        | 4.5    | OK     | 12/12 | spack+sbatch, voir section Romeo   |
+| Ubuntu 24.04 / WSL2     | g++ 13.3        | 4.5    | OK     | 13/13 | machine de développement principale |
+| Windows 11 (MinGW UCRT) | g++ 16.1        | 5.2    | OK     | 13/13 | via MSYS2, voir section Windows    |
+| Romeo (RHEL 9)          | g++ 14.2        | 4.5    | OK     | 13/13 | spack+sbatch, voir section Romeo   |
 
 Pré-requis communs : C++17, CMake ≥ 3.16, ninja recommandé.
 
@@ -188,7 +188,7 @@ output 128×128, seed 42, attempts 3, médiane sur 11 runs alternés) :
 | Build                | Median   | Speedup vs baseline |
 |----------------------|----------|---------------------|
 | Release sans LTO     | 4.280 s  | —                   |
-| Release + USE_LTO=ON | 4.134 s  | **+3.4%**           |
+| Release + USE_LTO=ON | 4.134 s  | +3.4%               |
 
 LTO testé aussi avec PGO en plus : +0.4% de gain supplémentaire, pas
 suffisant pour justifier la complexité d'un build en 2 passes. PGO

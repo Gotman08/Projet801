@@ -42,7 +42,7 @@ contiguës de 1, transitions). Pas de contradiction sur 5 attempts.
 
 ### `binary_stripes` — pattern très contraint
 
-Bandes verticales 0/1 alternées. Avec N=2, **seulement 2 tuiles uniques**.
+Bandes verticales 0/1 alternées. Avec N=2, 2 tuiles uniques.
 
 | Input (8×8) | Output 48×48 N=2 seed=1 |
 |---|---|

@@ -214,5 +214,25 @@ int main() {
         WFC_CHECK(stats.attempts <= 10);
     }
 
+    // === Cover the parallel min-entropy path ===
+    // parallel_min_entropy short-circuits to serial when
+    // total * num_tiles < 50 000 ops. To exercise the OMP-tasks branch
+    // (chunked partials + reduction), pick a sample/grid pair above the
+    // threshold: multivalue 64x64 with N=2 gives 4096 * num_tiles >> 50k.
+    {
+        Grid sample = make_multivalue_sample();
+        TileSet ts = TileSet::from_sample(sample, 2);
+        OverlapRules rules = OverlapRules::build(ts);
+
+        WFCSolverSerial serial;
+        WFCSolverOMP omp(4);
+        SolverStats ss, so;
+        Grid r_s = solve_with(serial, ts, rules, 3, 64, 64, 5, &ss);
+        Grid r_o = solve_with(omp,    ts, rules, 3, 64, 64, 5, &so);
+        WFC_CHECK(ss.success);
+        WFC_CHECK(so.success);
+        WFC_CHECK(grids_equal(r_s, r_o));
+    }
+
     return wfc_test::report();
 }

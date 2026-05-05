@@ -134,7 +134,7 @@ for (int k = 0; k < n_chunks; ++k) {
 Granularité : `~total / (4 × p)` cellules par tâche, ce qui produit `4 × p`
 tâches au total — assez pour le load-balancing dynamique sans inonder le
 runtime. La réduction finale est faite en ordre de chunk croissant pour rester
-**déterministe**.
+déterministe.
 
 **Propagation BFS (`propagate_tasks`)**
 

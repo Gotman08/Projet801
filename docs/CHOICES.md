@@ -252,13 +252,69 @@ sans dégrader les perfs CPU OpenMP. Trois changements clés :
 
 Optims existantes préservées : snapshot anti-race (sous forme de stack
 array), skip atomic AND quand `mask == ~0`, CAS dedup sur in_queue,
-réduction min-entropie déterministe. Optim ajoutée (depuis OMP) :
-relaxed-load avant atomic_fetch_and (mais désactivée pour l'instant
-car cassait la consistency entre threads — à ré-investiguer).
+réduction min-entropie déterministe. Optim ajoutée par parité avec OMP :
+relaxed-load avant atomic_fetch_and (lit le mot, skip le `lock and`
+quand l'AND serait un no-op).
 
 Limite : `MAX_WORDS_PER_CELL = 8` borne le nombre de tuiles à 512.
 Au-delà, le solver lève une exception. Aucun de nos samples ne s'en
 approche (max observé : multivalue_terrain N=3 = 73 tuiles = 2 mots).
+
+## Parallel attempts : orchestration au-dessus du backend
+
+Le backend OMP plafonne à ~5-8× speedup intra-attempt sur les workloads
+HPC (les barrières BFS et la contention atomique inter-NUMA dominent
+au-delà de 16 threads). Plutôt que de paralléliser plus à l'intérieur
+d'un attempt, `SolverOptions::parallel_attempts = K > 1` lance K
+attempts WFC indépendants en parallèle (chacun sériel sur son propre
+`Wave`). Le succès d'index minimum gagne, donc la sortie reste
+bit-identique à un retry séquentiel.
+
+Pourquoi ça paie :
+
+- Chaque attempt sériel n'a pas de barrière BFS partagée, pas de
+  contention atomique : 0% d'overhead synchronisation.
+- Sur workloads à fort taux d'échec par attempt (terrain N=3 ~10% de
+  succès), K attempts en parallèle trouvent un succès en ~1 attempt
+  wallclock au lieu de ~10. Mesure : 2.14× wallclock à K=8 sur
+  terrain_N3 24×24 (i9-10900K).
+
+Pourquoi ça ne paie pas toujours :
+
+- Sur workloads qui réussissent du premier coup (binary_5x5,
+  smooth_N3), K attempts = K× le travail pour le même résultat.
+- Sur workloads avec peu de retries (succès en 1-2 attempts), gain
+  marginal.
+
+L'orchestration appelle `serial_run_attempt` (de SolverCommon),
+*pas* le `propagate` du backend. Sinon : K attempts × (8 threads
+intra-attempt) = 8K threads contendant pour 8 cores, oversubscription.
+Cette séparation rend parallel_attempts compatible avec n'importe quel
+backend (Serial, OMP, Kokkos) sans risque de deadlock OMP imbriqué.
+
+## Work-density gate dans `propagate_tasks` : essayée puis rollbacked
+
+Tentative pour atténuer le plateau smooth_N3 (peak 2.23× à 4t puis
+régression) : ajouter un second seuil au-dessus du frontier-size :
+`frontier_size × num_tiles × (2N-1)² ≥ 50 000` ops. Idée : sérialiser
+les niveaux BFS qui n'ont pas assez de travail pour amortir la
+barrière OMP.
+
+Pourquoi rollbacked : le seuil aurait sérialisé les niveaux BFS
+moyens (50-500 cellules) sur binary_L11. Le peak Romeo de 5.27× à 8
+threads dépend précisément de la parallélisation de ces niveaux.
+Sans bench Romeo pour confirmer, le risque de régression sur
+binary > le gain hypothétique sur smooth.
+
+Conséquence : le plateau smooth_N3 est documenté comme fondamental
+([benchmark.md](benchmark.md) § "Plateau smooth_N3"). Contournement
+utilisateur : `--threads 4` (sweet spot intra-attempt) ou
+`--parallel-attempts K` quand le workload échoue souvent.
+
+Le seuil work-density a été conservé sur `parallel_min_entropy`, où
+il ne peut rien casser : il ne kick que quand `total × num_tiles <
+50 000` (typiquement grilles 32×32 où la sélection parallèle ne paie
+pas le coût de la `parallel region`).
 
 ## Tests : pas de framework externe
 
