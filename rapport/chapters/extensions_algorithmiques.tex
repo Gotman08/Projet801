@@ -370,3 +370,46 @@ pour empêcher le joueur de sortir de la zone walkable.
 Sans, la cible n'est pas générée du tout (vérifié :
 \texttt{ninja: no work to do} après reconfigure). Aucun impact sur le
 benchmark, les ctests, ou les solveurs parallèles.
+
+\subsection{Captures écran du dungeon généré}
+\label{sec:ext:ue5:screens}
+
+Trois captures du dungeon généré par \texttt{wfc\_dungeon} puis spawné dans
+UE 5.7 par le plugin \texttt{ADungeonGenerator}. Le grid binaire
+(\texttt{rooms.txt}, $N=2$, 24×24) est résolu par le solveur, sérialisé
+en JSON, puis chaque cellule \textit{walkable} est instanciée comme
+\texttt{StaticMeshComponent} (sol + variants) tandis que les cellules
+\textit{solid} bordant un walkable spawnent un wall mesh avec yaw
+cardinal correct.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\linewidth]{results/figures/ue5/ue5_dungeon_01.png}
+\caption{Vue d'ensemble du dungeon : grille 24×24 résolue par WFC,
+spawnée en 3D avec sols texturés, walls, et périmètre fermé
+(\texttt{bWallOnBorders=true}). Les pickups sont visibles sur
+plusieurs cellules walkable.}
+\label{fig:ue5_dungeon_01}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\linewidth]{results/figures/ue5/ue5_dungeon_02.png}
+\caption{Détail d'une intersection de couloirs : les meshes de sol
+sont choisis aléatoirement parmi
+\texttt{FloorMeshVariants} (variation visuelle), les walls sont
+orientés selon leurs voisins walkable. La connectivité globale
+walkable a été validée par flood-fill BFS avant spawn.}
+\label{fig:ue5_dungeon_02}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\linewidth]{results/figures/ue5/ue5_dungeon_03.png}
+\caption{Vue d'une pièce avec un \texttt{APlayerStart} (rendu par sa
+capsule), un NPC spawner et plusieurs pickups. L'allocation
+non-collisionnelle garantit qu'aucune cellule walkable n'héberge
+deux catégories d'actors. Le \texttt{ANavMeshBoundsVolume} couvre
+toute la grille, permettant l'IA NPC de naviguer.}
+\label{fig:ue5_dungeon_03}
+\end{figure}

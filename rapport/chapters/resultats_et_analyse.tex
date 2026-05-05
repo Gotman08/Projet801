@@ -95,6 +95,45 @@ Profilage du \texttt{wfc\_serial} sur Romeo, 128×128, $L = 11$ :
 \label{fig:speedup_binary}
 \end{figure}
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/scaling/speedup_band_binary_L11.png}
+\caption{Bande de speedup binary\_L11 (min/max sur 3 répétitions). La
+zone ombrée encadre la dispersion expérimentale ; on lit directement
+sur le graphe les régions stables (1-8 threads) et instables
+(>32 threads, où la régression varie d'un run à l'autre).}
+\label{fig:speedup_band_binary}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/scaling/efficiency_binary_L11.png}
+\caption{Efficacité parallèle $E(p) = S(p)/p$ sur binary\_L11. À 16
+threads sur 256×256, $E \approx 0.51$ (51\% d'efficacité). Au-delà
+de 32 threads, l'efficacité s'effondre sous 0.1 quelle que soit la
+taille.}
+\label{fig:efficiency_binary}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/scaling/throughput_binary_L11.png}
+\caption{Throughput (Mcells/s) binary\_L11. Le throughput maximal est
+atteint à 16 threads sur 256×256 (\textbf{15.4 Mcells/s}), $14\times$
+plus haut que le throughput serial sur la même taille (1.07 Mcells/s).}
+\label{fig:throughput_binary}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/scaling/heatmap_binary_L11.png}
+\caption{Heatmap speedup binary\_L11 (taille × threads). La diagonale
+verte (sweet spot) montre clairement que la taille optimale de grille
+suit le nombre de threads : pour 192 cores, il faudrait probablement
+une grille bien plus grande que 256×256 pour amortir la fork/join.}
+\label{fig:heatmap_binary}
+\end{figure}
+
 \begin{table}[H]
 \centering
 \begin{tabular}{lrrrrrrrr}
@@ -143,8 +182,92 @@ L'optim « frontier-threshold » (Section~\ref{sec:res:optim_frontier}) atténue
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{results/figures/amdahl/amdahl_binary_L11_256.png}
-\caption{Fit Amdahl binary\_L11 256×256.}
+\caption{Fit Amdahl binary\_L11 256×256, $f = 0.944$, ceiling
+théorique $17.8\times$, peak observé $8.23\times$ (46\% du ceiling).}
 \label{fig:amdahl_binary_256}
+\end{figure}
+
+\subsection{Évolution du fit avec la taille de grille}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/amdahl/amdahl_binary_L11_32.png}
+\caption{32×32, $f = 0.18$, ceiling $1.2\times$.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/amdahl/amdahl_binary_L11_64.png}
+\caption{64×64, $f = 0.74$, ceiling $3.8\times$.}
+\end{subfigure}
+
+\vspace{0.5em}
+
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/amdahl/amdahl_binary_L11_128.png}
+\caption{128×128, $f = 0.93$, ceiling $13.8\times$.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/amdahl/amdahl_binary_L11_256.png}
+\caption{256×256, $f = 0.94$, ceiling $17.8\times$.}
+\end{subfigure}
+
+\caption{Évolution du fit Amdahl binary\_L11 avec la taille de grille.
+La fraction parallélisable $f$ croît rapidement de 0.18 (32×32) à 0.94
+(256×256) : plus la grille est grande, plus la propagation et la
+sélection min-entropie deviennent dominantes face aux coûts fixes.}
+\label{fig:amdahl_binary_grid}
+\end{figure}
+
+\subsection{Effet de l'optim « frontier-threshold » sur Amdahl}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/amdahl/amdahl_binary_optim_128.png}
+\caption{Fit Amdahl binary\_L11 128×128 \textbf{après} activation de
+l'optim frontier-threshold. $f$ passe de 0.928 à 0.956, ceiling de
+$13.8\times$ à $22.9\times$. Le peak observé monte de $5.27\times$ à
+$6.10\times$ : l'optim ne suffit pas à atteindre le nouveau ceiling
+(coûts supra-Amdahl), mais elle pousse le mur.}
+\label{fig:amdahl_binary_optim}
+\end{figure}
+
+\subsection{Amdahl sur autres samples}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/amdahl/amdahl_terrain_L33_32.png}
+\caption{terrain\_L33 32×32.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/amdahl/amdahl_terrain_L33_64.png}
+\caption{terrain\_L33 64×64.}
+\end{subfigure}
+
+\vspace{0.5em}
+
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/amdahl/amdahl_terrain_L33_128.png}
+\caption{terrain\_L33 128×128, $f = 0.94$.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/amdahl/amdahl_smooth_N3_128.png}
+\caption{smooth\_N3 128×128, $f = 0.74$ (cas limite).}
+\end{subfigure}
+
+\caption{Fits Amdahl par sample. terrain\_L33 suit le même pattern que
+binary\_L11 (croissance de $f$ avec la taille). smooth\_N3 plafonne à
+$f = 0.74$ même à 128×128 : peu de tuiles ($L=12$) et $N=3$ →
+parallélisme structurel limité.}
+\label{fig:amdahl_other_samples}
 \end{figure}
 
 \begin{table}[H]
@@ -191,6 +314,35 @@ smooth\_N3 & 128 & 0.735 & 1.000 & 3.8× & 2.23× & 59\% \\
 \label{fig:speedup_terrain}
 \end{figure}
 
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/efficiency_terrain_L33.png}
+\caption{Efficacité parallèle terrain\_L33.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/throughput_terrain_L33.png}
+\caption{Throughput terrain\_L33.}
+\end{subfigure}
+
+\caption{terrain\_L33 : efficacité et throughput. À 128×128 et 8
+threads, $E \approx 71\%$ — meilleur que binary\_L11 à taille
+identique grâce au travail par cellule plus dense ($L = 33$ bits à
+manipuler vs 11).}
+\label{fig:scaling_terrain_combo}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/scaling/heatmap_terrain_L33.png}
+\caption{Heatmap terrain\_L33. Le sweet spot diagonal est plus
+prononcé que pour binary\_L11 : la pente d'optimum entre taille et
+threads est plus douce.}
+\label{fig:heatmap_terrain}
+\end{figure}
+
 \begin{table}[H]
 \centering
 \begin{tabular}{lrrrrrr}
@@ -212,6 +364,34 @@ terrain\_L33 128×128 & 33 & 1.00× & 3.43× & \textbf{5.69×} & 4.81× & 2.13×
 \includegraphics[width=0.85\linewidth]{results/figures/scaling/speedup_smooth_N3.png}
 \caption{smooth\_N3 scale beaucoup moins bien : peu de tuiles + $N = 3$ = peu de parallélisme par cellule.}
 \label{fig:speedup_smooth}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/efficiency_smooth_N3.png}
+\caption{Efficacité parallèle smooth\_N3.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/throughput_smooth_N3.png}
+\caption{Throughput smooth\_N3.}
+\end{subfigure}
+
+\caption{smooth\_N3 : efficacité et throughput plafonnent rapidement.
+Le plateau visible à 4 threads sur l'efficacité confirme l'analyse :
+au-delà, les barrières BFS dominent.}
+\label{fig:scaling_smooth_combo}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/scaling/heatmap_smooth_N3.png}
+\caption{Heatmap smooth\_N3. Sweet spot très étroit autour de
+4 threads, quel que soit la taille — comportement borné par la
+structure du sample, pas par la grille.}
+\label{fig:heatmap_smooth}
 \end{figure}
 
 \begin{table}[H]
@@ -329,6 +509,70 @@ Pas de fix algorithmique côté intra-attempt sans risquer de régresser binary.
 
 L'overhead Kokkos par rapport à OpenMP brut est $\sim 30\%$ sur ces workloads, attribuable au coût des Views et du dispatch \texttt{parallel\_for}. Acceptable pour le bénéfice de portabilité.
 
+\subsection{Comparaison directe serial / OMP / Kokkos}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/backends_binary_L11_32.png}
+\caption{binary\_L11 32×32.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/backends_binary_L11_64.png}
+\caption{binary\_L11 64×64.}
+\end{subfigure}
+
+\vspace{0.5em}
+
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/backends_binary_L11_128.png}
+\caption{binary\_L11 128×128.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/backends_binary_L11_256.png}
+\caption{binary\_L11 256×256.}
+\end{subfigure}
+
+\caption{Comparaison directe serial / OMP / Kokkos sur binary\_L11
+pour 4 tailles. Kokkos suit OMP de loin sur les petites grilles
+(overhead Views + dispatch) et se rapproche de OMP à 256×256 où le
+travail amortit l'overhead.}
+\label{fig:backends_binary}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/backends_terrain_L33_128.png}
+\caption{terrain\_L33 128×128.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/scaling/backends_smooth_N3_128.png}
+\caption{smooth\_N3 128×128.}
+\end{subfigure}
+
+\caption{Backends sur autres samples 128×128. Sur smooth\_N3,
+Kokkos suit serial très près : peu de parallélisme exploitable. Sur
+terrain\_L33, Kokkos bénéficie davantage de la parallélisation.}
+\label{fig:backends_other}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{results/figures/scaling/backends_binary_optim_128.png}
+\caption{binary\_L11 128×128 \textbf{après} optim frontier-threshold.
+Le delta entre Kokkos et OMP se réduit visiblement sous le régime
+optimisé : l'optim profite aux deux backends, mais OMP en absorbe
+mieux le gain à haut thread count.}
+\label{fig:backends_binary_optim}
+\end{figure}
+
 \subsection{Kokkos GPU sur GH200}
 
 \begin{table}[H]
@@ -445,6 +689,97 @@ Work-density gate dans \texttt{propagate\_tasks} & non mesuré & rollback (risqu
 \caption{Optimisations rejetées en A/B testing. Le compilateur \texttt{-O3 -march=native} fait déjà la plupart des optims source-level.}
 \label{tab:res:rejected}
 \end{table}
+
+% =============================================================================
+\section{Galerie de sorties WFC}
+\label{sec:res:gallery}
+% =============================================================================
+
+Au-delà des chiffres, voici un aperçu qualitatif des grilles produites
+par le solveur. Trois seeds différents par sample montrent la variété
+sans dégrader la cohérence locale (chaque sous-bloc $N \times N$
+apparaît bien dans l'échantillon source).
+
+\subsection{rooms (dungeon binaire)}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/gallery/rooms_seed1.png}
+\caption{seed = 1.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/gallery/rooms_seed7.png}
+\caption{seed = 7.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/gallery/rooms_seed42.png}
+\caption{seed = 42.}
+\end{subfigure}
+
+\caption{Sample \texttt{rooms} (binaire, $N=2$, 11 tuiles), 3 seeds.
+Pièces rectangulaires connectées par couloirs ; la composante
+walkable est connexe (vérifiée par flood-fill BFS de \texttt{wfc\_dungeon}).}
+\label{fig:gallery_rooms}
+\end{figure}
+
+\subsection{skyline (urbain multi-valeurs)}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/gallery/skyline_seed1.png}
+\caption{seed = 1.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/gallery/skyline_seed7.png}
+\caption{seed = 7.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/gallery/skyline_seed42.png}
+\caption{seed = 42.}
+\end{subfigure}
+
+\caption{Sample \texttt{skyline} (4 valeurs, $N=3$, 79 tuiles), 3 seeds.
+Bâtiments cohérents avec fenêtres et fondations, ciel uniforme. Les
+trois variantes diffèrent dans la disposition mais respectent la
+grammaire locale du sample d'entrée.}
+\label{fig:gallery_skyline}
+\end{figure}
+
+\subsection{plant (plante avec fleurs)}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/gallery/plant_seed1.png}
+\caption{seed = 1.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/gallery/plant_seed7.png}
+\caption{seed = 7.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{results/figures/results/gallery/plant_seed42.png}
+\caption{seed = 42.}
+\end{subfigure}
+
+\caption{Sample \texttt{plant} (4 valeurs, $N=3$, 94 tuiles), 3 seeds.
+Tiges, fleurs et feuilles cohérentes, ancrées au sol. Cas riche
+($L=94$) où l'expansion D4 (\texttt{--symmetries 4 ou 8}, voir
+Chapitre~\ref{chap:extensions}) permettrait une variation orientation
+plus marquée.}
+\label{fig:gallery_plant}
+\end{figure}
 
 % =============================================================================
 \section{Recommandations d'utilisation}
