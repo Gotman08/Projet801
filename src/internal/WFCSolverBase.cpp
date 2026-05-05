@@ -125,10 +125,23 @@ Grid WFCSolverBase::solve_parallel(const TileSet& tiles,
             if (k >= lowest_success.load(std::memory_order_relaxed)) continue;
             const std::uint64_t seed =
                 attempt_seed(opt.seed, batch_start + k);
-            std::mt19937_64 rng(seed);
             SolverStats local;
-            const bool ok = serial_run_attempt(waves[k], tiles, rules,
-                                               seed, rng, local);
+            // Each parallel attempt picks its own strategy : when
+            // use_backtracking is true, we run a single deterministic
+            // backtracking search per slot ; otherwise we run the legacy
+            // weighted-pick + restart strategy. Combining --backtrack
+            // with --parallel-attempts K means K independent backtracking
+            // searches, each seeded differently, all racing for the
+            // lowest-indexed success.
+            bool ok;
+            if (opt.use_backtracking) {
+                ok = serial_run_attempt_backtrack(waves[k], tiles, rules,
+                                                  seed, local);
+            } else {
+                std::mt19937_64 rng(seed);
+                ok = serial_run_attempt(waves[k], tiles, rules,
+                                        seed, rng, local);
+            }
             collapses[k] = local.collapses;
             propagations[k] = local.propagations;
             success[k] = ok ? 1 : 0;

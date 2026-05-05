@@ -364,23 +364,41 @@ Algorithme :
 
 Choix de design :
 
-- **Snapshot complet** plutôt que delta-encoding. La wave fait
-  ~32 KB pour 64×64 binaire, négligeable même avec 1000 frames de pile.
-  Delta-encoding aurait demandé d'instrumenter `serial_propagate` pour
-  tracker quels mots changent : invasif, et bénéfice marginal.
+- **Delta-encoded snapshot** plutôt que snapshot complet. Une frame
+  ne stocke que les cellules effectivement modifiées par la
+  propagation : `~50 cellules × words_per_cell × 16 octets` par frame
+  vs `rows·cols·words_per_cell × 8 octets` pour un snapshot plein.
+  Sur 64×64 binaire = 80× moins de mémoire ; sur 256×256 = même
+  ordre. Implémenté via une variante `serial_propagate_with_delta`
+  qui peek le pre-state en stack scratch et ne push dans le delta
+  que si `and_with` mute effectivement la cellule. Un flag `touched`
+  par cellule (vector réutilisé entre frames) garantit qu'une cellule
+  modifiée plusieurs fois ne pousse son pre-state qu'une fois.
 - **Choix triés par fréquence descendante** au lieu de tirage pondéré
   aléatoire. Le backtracking est déterministe pour un seed donné :
   la tuile la plus fréquente est essayée en premier, ce qui suit
   l'heuristique « try the most likely candidate ». Les seeds différents
   produisent des sorties différentes via `cell_jitter` (entropy ties).
-- **Bypass complet du backend parallèle**. `solve_sequential` détecte
-  `use_backtracking == true` et invoque directement
-  `serial_run_attempt_backtrack` au lieu de `run_attempt`. Le snapshot
-  / restore n'a de sens qu'en single-threaded ; combiner backtrack +
-  OMP intra-attempt ouvrirait des races inutilement complexes.
+- **Bypass complet du backend parallèle intra-attempt**. Quand
+  `use_backtracking=true`, `solve_sequential` invoque directement
+  `serial_run_attempt_backtrack` au lieu de la dispatch backend. Le
+  snapshot/restore n'a de sens qu'en single-threaded ; combiner
+  backtrack + OMP intra-attempt ouvrirait des races inutilement
+  complexes.
+- **Composition avec parallel-attempts**. `solve_parallel` détecte
+  `use_backtracking=true` et lance K recherches backtrack indépendantes
+  en parallèle (chacune avec son seed dérivé, donc ordre de tie-break
+  différent → arbre d'exploration différent). Le succès d'index
+  minimum gagne. C'est la forme classique de « parallel backtracking
+  via independent searches ». Les snapshots restent locaux à chaque
+  thread, donc pas de partage d'état entre searches.
 
-Mesure : terrain N=3 32×32 où retry-30-attempts échoue en 0.3 s,
-backtrack résout en 0.076 s avec quelques milliers de propagations.
+Mesures locales (Windows i9-10900K) :
+- terrain N=3 32×32 : retry-30 échoue en 0.38 s ; `--backtrack` réussit
+  en 0.12 s ; `--parallel-attempts 8 --backtrack` réussit en 0.20 s
+  (slowdown vs single backtrack ici car le single trouve déjà vite).
+- terrain N=3 16×16 : `--backtrack` en 0.06 s avec 5 collapses, vs
+  retry-30 en 0.04 s (retry suffit sur ce cas, backtrack neutre).
 
 ## Tests : pas de framework externe
 

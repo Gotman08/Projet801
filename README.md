@@ -31,6 +31,22 @@ Backends :
 
 Les trois produisent un output bit-identique pour un même seed.
 
+## Galerie
+
+Trois échantillons inspirés du papier WFC original (skyline urbain,
+plante avec fleurs, dungeon binaire) tournés à `N=3` avec
+`--parallel-attempts 8` pour absorber le taux de contradiction de N=3
+sans coût wallclock.
+
+| | Seed 1 | Seed 7 | Seed 42 |
+|---|---|---|---|
+| **skyline** | ![1](docs/figures/results/gallery/skyline_seed1.png) | ![7](docs/figures/results/gallery/skyline_seed7.png) | ![42](docs/figures/results/gallery/skyline_seed42.png) |
+| **plant** | ![1](docs/figures/results/gallery/plant_seed1.png) | ![7](docs/figures/results/gallery/plant_seed7.png) | ![42](docs/figures/results/gallery/plant_seed42.png) |
+| **rooms** | ![1](docs/figures/results/gallery/rooms_seed1.png) | ![7](docs/figures/results/gallery/rooms_seed7.png) | ![42](docs/figures/results/gallery/rooms_seed42.png) |
+
+Reproductible avec `./scripts/render_gallery.sh build`. La galerie
+complète avec les samples d'entrée est dans [docs/results.md](docs/results.md).
+
 ## Build
 
 Pré-requis : un compilateur C++17 avec OpenMP, CMake ≥ 3.16.
@@ -152,14 +168,27 @@ dans toutes les orientations.
 
 `--backtrack` remplace la stratégie restart-on-contradiction par un
 parcours arborescent : chaque collapse pousse une frame
-(cellule, choix restants, snapshot wave) sur une pile ; en cas de
-contradiction la frame du sommet est dépilée et le choix suivant est
-essayé. Utile sur les samples très contraints où retry échoue
-systématiquement (ex. terrain N=3 32×32 : retry échoue en 30
-attempts, backtrack résout en ~80 ms). Default désactivé : le chemin
-hot reste inchangé. Coût mémoire : `O(rows·cols·words_per_cell)` par
-frame de pile, soit ~32 KB pour 64×64 binaire ; OK jusqu'à 256×256
-mais attention au-delà.
+(cellule, choix restants, delta des modifications) sur une pile ; en
+cas de contradiction la frame du sommet est dépilée et le choix
+suivant est essayé. Utile sur les samples très contraints où retry
+échoue systématiquement (ex. terrain N=3 32×32 : retry échoue en 30
+attempts, backtrack résout en ~120 ms). Default désactivé : le chemin
+hot reste inchangé.
+
+Optimisations livrées :
+
+- **Delta-encoded snapshot** : chaque frame ne stocke que les cellules
+  effectivement modifiées par la propagation, pas le wave complet.
+  Mémoire : `~50 cellules × words_per_cell × 16 octets` par frame
+  (vs `rows·cols·words_per_cell × 8 octets` pour un snapshot plein),
+  soit ~80× moins sur 64×64 binaire. Permet le backtrack sur grilles
+  larges sans saturer la RAM.
+- **Composition avec parallel-attempts** : `--parallel-attempts K
+  --backtrack` lance K recherches backtrack indépendantes en parallèle
+  (chacune avec son propre seed → ordre de tie-break différent → arbre
+  d'exploration différent). Le succès d'index minimum gagne. Utile
+  quand un single backtrack risque d'échouer même sur l'arbre complet
+  (sample sur-contraint mais avec quelques seeds chanceux).
 
 ## Format des échantillons
 
