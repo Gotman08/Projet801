@@ -279,10 +279,10 @@ sur la zone de recouvrement (en jaune).
 \end{frame}
 
 % ============================================================
-\section{Profilage et OpenMP}
+\section{Profilage et OpenMP \texttt{task}}
 \subsection{Profilage série}
-\subsection{Min-entropie chunkée}
-\subsection{Single parallel region}
+\subsection{Min-entropie : \texttt{omp task} chunked}
+\subsection{Propagation : single parallel region}
 \subsection{Atomic relaxed-load}
 \subsection{A/B des optimisations}
 
@@ -310,8 +310,9 @@ Extraction tuiles & $< 0.01\%$ \\
 \vspace{0.2cm}
 \textbf{Conséquence}
 \begin{itemize}
-    \item L'effort principal porte sur la \emph{sélection}, pas la propagation.
-    \item Notre première intuition (\og la propagation domine \fg) était fausse.
+\footnotesize
+    \item Effort principal sur la \emph{sélection}, pas la propagation.
+    \item Les deux étapes sont parallélisées avec l'API \textbf{\texttt{\#pragma omp task}} explicite (sujet CHPS0801).
 \end{itemize}
 \end{column}
 \end{columns}
@@ -494,9 +495,9 @@ OMP 16t baseline & 7.55\,s & 8.13$\times$ \\
 \end{frame}
 
 % ============================================================
-\section{Kokkos et GPU}
-\subsection{Architecture portable}
-\subsection{Contraintes GPU}
+\section{Kokkos : portabilité CPU + GPU}
+\subsection{Architecture \texttt{View} + \texttt{parallel\_for}}
+\subsection{Contraintes GPU et atomics}
 
 \begin{frame}{Kokkos : architecture}
 \begin{columns}[T]
@@ -504,12 +505,13 @@ OMP 16t baseline & 7.55\,s & 8.13$\times$ \\
 \includegraphics[width=\textwidth]{results/figures/schemas/kokkos_architecture.png}
 \end{column}
 \begin{column}{0.42\textwidth}
-\textbf{Un seul code source}
+\textbf{API Kokkos utilisée}
 \begin{itemize}
 \footnotesize
-    \item OpenMP, CUDA, HIP, SYCL
-    \item \texttt{View<u64*, MemSpace>} pour la wave
-    \item Functor \texttt{PropagateOp} : \texttt{KOKKOS\_INLINE\_FUNCTION}
+    \item \texttt{Kokkos::View<u64*, MemSpace>} : wave + règles
+    \item \texttt{Kokkos::parallel\_for} : dispatch propagation
+    \item \texttt{KOKKOS\_INLINE\_FUNCTION} : functor portable host/device
+    \item \texttt{Kokkos::atomic\_*} : load, fetch\_and, compare\_exchange
 \end{itemize}
 
 \vspace{0.15cm}
@@ -517,8 +519,8 @@ OMP 16t baseline & 7.55\,s & 8.13$\times$ \\
 \begin{itemize}
 \footnotesize
     \item CPU : zero-copy (UnmanagedView wrap \texttt{wave.raw\_words()})
-    \item GPU : \texttt{deep\_copy} host $\leftrightarrow$ device
-    \item 0 overhead sur build CPU
+    \item GPU : \texttt{Kokkos::deep\_copy} host $\leftrightarrow$ device
+    \item 0 overhead sur build CPU, 1 source pour OMP/CUDA
 \end{itemize}
 \end{column}
 \end{columns}
