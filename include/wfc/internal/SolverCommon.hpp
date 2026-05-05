@@ -89,6 +89,18 @@ bool serial_run_attempt(Wave& wave,
                         std::mt19937_64& rng,
                         SolverStats& stats);
 
+// Backtracking variant of serial_run_attempt. Each collapse pushes a
+// frame (cell, remaining-choices, wave-snapshot) onto a stack ; on
+// contradiction the top frame is popped and the next choice is tried.
+// Returns true if any consistent solution exists in the search tree
+// rooted at the initial wave. Choices are ordered by descending
+// frequency (most frequent tile tried first) for stable behavior.
+bool serial_run_attempt_backtrack(Wave& wave,
+                                  const TileSet& tiles,
+                                  const OverlapRules& rules,
+                                  std::uint64_t seed,
+                                  SolverStats& stats);
+
 // Reconstruct the output grid from a fully collapsed wave: pixel (r, c)
 // receives the top-left value of the tile selected at (r, c).
 Grid build_output(const Wave& wave, const TileSet& tiles);

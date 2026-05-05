@@ -2,9 +2,11 @@
 
 #include "wfc/WFCSolver.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <queue>
+#include <vector>
 
 namespace wfc {
 
@@ -126,6 +128,99 @@ bool serial_run_attempt(Wave& wave,
         ++stats.collapses;
         if (!serial_propagate(wave, rules, cell, stats.propagations))
             return false;
+    }
+}
+
+namespace {
+
+// One decision point on the backtrack stack. Holds the cell that was
+// collapsed, the remaining tile choices to try if the current one
+// fails (LIFO via vector::back), and a snapshot of the wave taken
+// just before the cell was first decided so that restoring it undoes
+// both the collapse and the propagation that followed.
+struct BacktrackFrame {
+    int cell;
+    std::vector<int> tries;
+    std::vector<std::uint64_t> wave_snapshot;
+};
+
+void snapshot_wave(const Wave& wave, std::vector<std::uint64_t>& out) {
+    out.assign(wave.raw_words(), wave.raw_words() + wave.total_words());
+}
+
+void restore_wave(Wave& wave, const std::vector<std::uint64_t>& snap) {
+    std::copy(snap.begin(), snap.end(), wave.raw_words());
+}
+
+} // namespace
+
+bool serial_run_attempt_backtrack(Wave& wave,
+                                  const TileSet& tiles,
+                                  const OverlapRules& rules,
+                                  std::uint64_t seed,
+                                  SolverStats& stats) {
+    const auto& freq = tiles.frequencies();
+    std::vector<BacktrackFrame> stack;
+
+    auto try_top = [&]() -> bool {
+        // Pop tile candidates off the top frame until one survives
+        // propagation, or the frame is exhausted. Returns true on
+        // forward progress, false if the top frame ran out of choices.
+        BacktrackFrame& top = stack.back();
+        while (!top.tries.empty()) {
+            const int t = top.tries.back();
+            top.tries.pop_back();
+            restore_wave(wave, top.wave_snapshot);
+            wave.at(top.cell).set_only(static_cast<std::size_t>(t));
+            ++stats.collapses;
+            if (serial_propagate(wave, rules, top.cell, stats.propagations))
+                return true;
+        }
+        return false;
+    };
+
+    while (true) {
+        const int cell = serial_min_entropy(wave, freq, seed).cell;
+        if (cell < 0) {
+            // Every undecided cell is now collapsed (count <= 1). Sanity
+            // check : no cell ended up with count == 0.
+            bool ok = true;
+            for (int c = 0; c < wave.num_cells(); ++c) {
+                if (wave.at(c).count() == 0) { ok = false; break; }
+            }
+            if (ok) return true;
+            // Fall through to backtrack.
+        } else {
+            // Open a new decision frame at this cell. Snapshot the wave
+            // before collapsing so we can restore on contradiction.
+            // Order candidates by descending frequency : the back of
+            // the vector (popped first) is the most-frequent tile.
+            BacktrackFrame frame;
+            frame.cell = cell;
+            snapshot_wave(wave, frame.wave_snapshot);
+            wave.at(cell).for_each_set([&](std::size_t t) {
+                frame.tries.push_back(static_cast<int>(t));
+            });
+            std::sort(frame.tries.begin(), frame.tries.end(),
+                      [&](int a, int b) {
+                          const std::uint32_t fa = freq[a];
+                          const std::uint32_t fb = freq[b];
+                          if (fa != fb) return fa < fb;
+                          return a > b;
+                      });
+            stack.push_back(std::move(frame));
+            if (try_top()) continue; // forward
+        }
+
+        // Backtrack : pop frames until one has a working alternative,
+        // or the stack empties (search tree exhausted).
+        if (!stack.empty()) stack.pop_back();
+        bool recovered = false;
+        while (!stack.empty()) {
+            if (try_top()) { recovered = true; break; }
+            stack.pop_back();
+        }
+        if (!recovered) return false;
     }
 }
 

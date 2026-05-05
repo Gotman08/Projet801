@@ -140,9 +140,11 @@ if(BUILD_TESTING)
   add_executable(test_solver            tests/test_solver.cpp)
   add_executable(test_edge_cases        tests/test_edge_cases.cpp)
   add_executable(test_parallel_attempts tests/test_parallel_attempts.cpp)
+  add_executable(test_symmetries        tests/test_symmetries.cpp)
+  add_executable(test_backtrack         tests/test_backtrack.cpp)
   foreach(t test_bitset test_grid test_grid_io test_tileset test_overlap
             test_wave test_solver_common test_solver test_edge_cases
-            test_parallel_attempts)
+            test_parallel_attempts test_symmetries test_backtrack)
     target_link_libraries(${t} PRIVATE wfc_core)
     add_test(NAME ${t} COMMAND ${t})
   endforeach()

@@ -1,0 +1,19 @@
+# Skyline sample : black sky (0), grey buildings (9), olive-yellow
+# windows (10), brown foundation strip (7). N=3 captures the local
+# motifs : window-in-wall, wall-edge-against-sky, building-meets-foundation.
+# Extra sky rows on top so the toroidal wrap doesn't squash multiple
+# ground strips into the output.
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+0 0 9 9 9 0 0 0 0 0 0 0 0 0 0 0
+0 0 9 10 9 0 0 9 9 9 0 0 0 0 0 0
+0 0 9 10 9 0 0 9 10 9 0 0 0 9 9 0
+0 0 9 10 9 0 0 9 10 9 0 0 0 9 10 0
+0 9 9 10 9 0 0 9 10 9 0 0 0 9 9 0
+0 9 10 10 9 0 0 9 10 9 0 0 0 9 9 0
+0 9 10 9 9 9 9 9 10 9 9 9 9 9 9 0
+0 9 9 9 9 10 9 9 9 10 9 10 9 9 9 0
+9 9 10 9 9 9 9 9 9 9 9 9 9 9 9 9
+7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7

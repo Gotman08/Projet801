@@ -316,6 +316,72 @@ il ne peut rien casser : il ne kick que quand `total × num_tiles <
 50 000` (typiquement grilles 32×32 où la sélection parallèle ne paie
 pas le coût de la `parallel region`).
 
+## Symétries D4 : opt-in, zéro coût si désactivées
+
+Le sujet et l'article de référence mentionnent que le tile set peut
+être étendu par rotations / réflexions. Cette extension est livrée mais
+strictement opt-in via `TileSet::from_sample(grid, N, symmetries)` et
+le flag CLI `--symmetries S`.
+
+S valides :
+- `1` (défaut) : pas d'expansion. Comportement strictement identique
+  à l'ancien code (vérifié bit-à-bit par `test_symmetries`). Aucun
+  if-check supplémentaire dans la hot path d'extraction.
+- `2` : ajoute la rotation 180° de chaque pattern.
+- `4` : ajoute les 4 rotations (0°/90°/180°/270°).
+- `8` : groupe diédral D4 complet (4 rotations + 4 réflexions).
+
+Coût : la génération des variantes se fait une fois à l'extraction
+(quelques µs sur les samples typiques). Le solver ne sait pas que les
+tuiles viennent de symétries, il voit juste un `L` plus grand. Effet
+indirect : `L` peut passer de 11 à 88 → 2 mots de Bitset au lieu de 1
+→ solver ~1.5× plus lent. C'est cohérent : plus de variantes = plus
+de choix par cellule.
+
+Implémentation : `Tile::rotated_90()` et `Tile::reflected_horizontal()`
+sont des helpers purs qui retournent un nouveau `Tile`. La déduplication
+par hash assure que les patterns auto-symétriques (uniformes, damiers)
+ne voient pas leur fréquence double-comptée. Test
+`test_symmetries.cpp` vérifie l'invariant fondamental
+`rotated_90⁴ = identity` et `reflected² = identity`.
+
+## Backtracking : opt-in, mécanisme de snapshot/restore
+
+Sur les samples très contraints (terrain N=3 sur petite grille), la
+stratégie restart-on-contradiction épuise rapidement `max_attempts`
+sans trouver de solution. Le backtracking, opt-in via
+`SolverOptions::use_backtracking` ou `--backtrack`, explore
+l'arbre de recherche au lieu d'abandonner.
+
+Algorithme :
+1. À chaque collapse, snapshot complet de la wave + ouverture d'une
+   frame `{cell, candidates_restants, snapshot}` sur une pile.
+2. Tentative de propagation. Sur succès → continue forward.
+3. Sur contradiction → pop choices du frame courant jusqu'à un succès,
+   ou backtrack au frame parent si épuisé.
+4. Frame parent : restore sa snapshot, essaie son choix suivant.
+5. Pile vide → l'arbre entier a été parcouru sans solution → échec.
+
+Choix de design :
+
+- **Snapshot complet** plutôt que delta-encoding. La wave fait
+  ~32 KB pour 64×64 binaire, négligeable même avec 1000 frames de pile.
+  Delta-encoding aurait demandé d'instrumenter `serial_propagate` pour
+  tracker quels mots changent : invasif, et bénéfice marginal.
+- **Choix triés par fréquence descendante** au lieu de tirage pondéré
+  aléatoire. Le backtracking est déterministe pour un seed donné :
+  la tuile la plus fréquente est essayée en premier, ce qui suit
+  l'heuristique « try the most likely candidate ». Les seeds différents
+  produisent des sorties différentes via `cell_jitter` (entropy ties).
+- **Bypass complet du backend parallèle**. `solve_sequential` détecte
+  `use_backtracking == true` et invoque directement
+  `serial_run_attempt_backtrack` au lieu de `run_attempt`. Le snapshot
+  / restore n'a de sens qu'en single-threaded ; combiner backtrack +
+  OMP intra-attempt ouvrirait des races inutilement complexes.
+
+Mesure : terrain N=3 32×32 où retry-30-attempts échoue en 0.3 s,
+backtrack résout en 0.076 s avec quelques milliers de propagations.
+
 ## Tests : pas de framework externe
 
 Pas de gtest, pas de catch2. `test_helpers.hpp` (40 lignes) suffit pour

@@ -28,6 +28,38 @@ struct Tile {
     bool operator==(const Tile& other) const {
         return N == other.N && data == other.data;
     }
+
+    // Returns the tile rotated 90 degrees clockwise. New (r, c) reads
+    // from the original (N - 1 - c, r). Used by TileSet::from_sample
+    // when symmetry expansion is enabled (--symmetries 4 or 8).
+    Tile rotated_90() const {
+        Tile t;
+        t.N = N;
+        t.data.resize(static_cast<std::size_t>(N) * N);
+        for (int r = 0; r < N; ++r) {
+            for (int c = 0; c < N; ++c) {
+                t.data[static_cast<std::size_t>(r) * N + c] =
+                    at(N - 1 - c, r);
+            }
+        }
+        return t;
+    }
+
+    // Returns the tile reflected horizontally (left-right flip).
+    // Combined with the four rotations, this generates the full
+    // dihedral group D4 of 8 symmetries (--symmetries 8).
+    Tile reflected_horizontal() const {
+        Tile t;
+        t.N = N;
+        t.data.resize(static_cast<std::size_t>(N) * N);
+        for (int r = 0; r < N; ++r) {
+            for (int c = 0; c < N; ++c) {
+                t.data[static_cast<std::size_t>(r) * N + c] =
+                    at(r, N - 1 - c);
+            }
+        }
+        return t;
+    }
 };
 
 struct TileHash {

@@ -21,6 +21,8 @@ struct Args {
     std::uint64_t seed = 0;
     int attempts = 5;
     int parallel_attempts = 1;
+    int symmetries = 1;
+    bool backtrack = false;
     int threads = 0;
     int scale = 8;
     std::string out_txt;
@@ -38,6 +40,8 @@ inline void print_usage(const char* prog) {
         "  --seed S           rng seed (default 0)\n"
         "  --attempts A       max attempts on contradiction (default 5)\n"
         "  --parallel-attempts K  run K attempts concurrently (default 1)\n"
+        "  --symmetries S     tile symmetry expansion : 1, 2, 4, 8 (default 1)\n"
+        "  --backtrack        use backtracking instead of restart-on-contradiction\n"
         "  --threads T        parallel threads (default: backend default)\n"
         "  --scale S          render scale for ppm/png (default 8)\n"
         "  --out FILE.txt     write text output\n"
@@ -71,6 +75,8 @@ inline Args parse(int argc, char** argv) {
         else if (k == "--seed")     a.seed     = std::stoull(next("--seed"));
         else if (k == "--attempts") a.attempts = std::stoi(next("--attempts"));
         else if (k == "--parallel-attempts") a.parallel_attempts = std::stoi(next("--parallel-attempts"));
+        else if (k == "--symmetries") a.symmetries = std::stoi(next("--symmetries"));
+        else if (k == "--backtrack") a.backtrack = true;
         else if (k == "--threads")  a.threads  = std::stoi(next("--threads"));
         else if (k == "--scale")    a.scale    = std::stoi(next("--scale"));
         else if (k == "--out")      a.out_txt  = next("--out");
@@ -86,7 +92,7 @@ inline void run(WFCSolver& solver, const Args& a) {
     if (a.help_only) return;  // --help was handled by parse(), nothing to run
     Grid sample = read_grid_txt(a.sample);
     auto t0 = std::chrono::steady_clock::now();
-    TileSet tiles = TileSet::from_sample(sample, a.N);
+    TileSet tiles = TileSet::from_sample(sample, a.N, a.symmetries);
     OverlapRules rules = OverlapRules::build(tiles);
     auto t1 = std::chrono::steady_clock::now();
     double rules_s = std::chrono::duration<double>(t1 - t0).count();
@@ -97,6 +103,7 @@ inline void run(WFCSolver& solver, const Args& a) {
     opt.seed = a.seed;
     opt.max_attempts = a.attempts;
     opt.parallel_attempts = a.parallel_attempts;
+    opt.use_backtracking = a.backtrack;
 
     SolverStats stats;
     Grid out = solver.solve(tiles, rules, opt, stats);

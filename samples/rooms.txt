@@ -1,0 +1,18 @@
+# Binary "rooms" sample inspired by classic WFC dungeon outputs :
+# rectangular rooms (0) connected through doorways carved out of
+# wall blocks (1). Local motifs that WFC must learn :
+#   - L-corners and T-junctions at room boundaries
+#   - 1-cell-wide doorways
+#   - rectangular interior fills
+1 1 1 1 1 1 1 1 1 1 1 1
+1 0 0 0 1 1 0 0 0 0 0 1
+1 0 0 0 0 0 0 0 0 0 0 1
+1 0 0 0 1 1 0 0 0 0 0 1
+1 1 0 1 1 1 1 1 0 1 1 1
+1 0 0 0 0 0 0 0 0 0 0 1
+1 0 0 0 1 1 0 1 1 0 0 1
+1 0 0 0 1 0 0 0 1 0 0 1
+1 1 1 0 1 0 0 0 1 1 0 1
+1 0 0 0 1 0 0 0 0 0 0 1
+1 0 0 0 0 0 1 1 0 0 0 1
+1 1 1 1 1 1 1 1 1 1 1 1

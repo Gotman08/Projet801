@@ -123,17 +123,43 @@ OMP_NUM_THREADS=8 ./build/wfc_omp samples/binary_5x5.txt --rows 128 --cols 128 \
 | `--seed`          | seed RNG (output déterministe pour un seed donné) |
 | `--attempts`      | nombre maximal de retentatives sur contradiction |
 | `--parallel-attempts K` | lance K attempts en parallèle, garde le succès d'index minimum (défaut 1) |
+| `--symmetries S`  | expansion D4 du tile set : 1, 2, 4, 8 (défaut 1, désactivé) |
+| `--backtrack`     | utilise le backtracking au lieu du restart sur contradiction (défaut désactivé) |
 | `--threads`       | threads (OMP)                                |
 | `--scale`         | facteur de zoom du rendu PPM/PNG             |
 | `--out FILE.txt`  | écriture de la grille texte                  |
 | `--ppm FILE.ppm`  | rendu PPM (P6)                               |
 | `--png FILE.png`  | rendu PNG via `stb_image_write.h`            |
 
+### Options optionnelles, zéro impact sur la perf si désactivées
+
 `--parallel-attempts` paie sur les workloads serrés où chaque attempt a
 un risque d'échec (ex. terrain N=3) : 2.14× wallclock observé à K=8 vs
 K=1 sur terrain N=3 24×24. Inutile sur les workloads qui réussissent
 toujours du premier coup : K attempts = K× le travail pour le même
 résultat.
+
+`--symmetries S` étend le catalogue de tuiles avec les variantes D4
+(rotations 90°/180°/270° et leurs réflexions horizontales). Les
+variantes héritent de la fréquence de leur source. À S=1 (défaut), le
+chemin est strictement identique au comportement legacy : aucune
+génération de variant, aucun coût additionnel. À S>1, le seul coût est
+une étape one-shot lors de l'extraction (quelques µs même pour gros
+samples). Effet sur le solver : `L` croît jusqu'à 8× → bitsets passent
+parfois à 2 mots → solver ~1.5× plus lent. Bénéfice : motifs
+asymétriques (chemins, branchages, escaliers) appliqués uniformément
+dans toutes les orientations.
+
+`--backtrack` remplace la stratégie restart-on-contradiction par un
+parcours arborescent : chaque collapse pousse une frame
+(cellule, choix restants, snapshot wave) sur une pile ; en cas de
+contradiction la frame du sommet est dépilée et le choix suivant est
+essayé. Utile sur les samples très contraints où retry échoue
+systématiquement (ex. terrain N=3 32×32 : retry échoue en 30
+attempts, backtrack résout en ~80 ms). Default désactivé : le chemin
+hot reste inchangé. Coût mémoire : `O(rows·cols·words_per_cell)` par
+frame de pile, soit ~32 KB pour 64×64 binaire ; OK jusqu'à 256×256
+mais attention au-delà.
 
 ## Format des échantillons
 

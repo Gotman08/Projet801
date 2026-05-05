@@ -377,8 +377,20 @@ Le projet remplit les trois objectifs du sujet :
    queue avec lazy invalidation au lieu de re-scanner toute la wave à
    chaque collapse, la sélection passerait de 85% à <10% du temps
    total.
-4. **Symétries** : rotations/reflexions des tuiles (extension classique
-   de WFC) au niveau de `TileSet::from_sample`. Multiplie par 8 le
-   nombre de tuiles disponibles sans agrandir l'échantillon.
-5. **SIMD bitset** : AVX2/AVX-512 sur les opérations AND/OR
+4. **SIMD bitset** : AVX2/AVX-512 sur les opérations AND/OR
    `Bitset` pour accélérer même la version série quand `L > 64`.
+
+**Extensions livrées au-dessus du sujet** (toutes opt-in, zéro coût
+sur le chemin par défaut) :
+
+- **Symétries D4** (`--symmetries 1|2|4|8`) : expansion du tile set
+  par rotations + réflexions au moment de l'extraction.
+- **Backtracking** (`--backtrack`) : exploration arborescente avec
+  snapshot/restore, alternative au restart-on-contradiction.
+- **Parallel attempts** (`--parallel-attempts K`) : K essais
+  indépendants en parallèle, succès d'index minimum gagne.
+- **Backend GPU CUDA** via Kokkos refactor (compile et tourne sur
+  GH200, 12/12 tests passent).
+- **Démo UE5** (`-DBUILD_DUNGEON=ON`) : CLI `wfc_dungeon` qui émet
+  un JSON consommé par un plugin Unreal Engine 5.7 pour spawner les
+  cellules en 3D.

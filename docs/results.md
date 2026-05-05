@@ -110,6 +110,54 @@ Augmenter N (2 → 3) capture des motifs locaux plus précis : la sortie
 reproduit mieux les courbes de transition, au prix d'un tile set plus
 gros et d'un solveur plus lent.
 
+## Galerie style WFC paper (skyline / plant / rooms)
+
+Échantillons inspirés des images les plus classiques du papier WFC
+original (Maxim Gumin) : un skyline urbain, une plante avec fleurs,
+et un dungeon binaire à pièces rectangulaires. Tous tournés à N=3
+pour capturer les motifs locaux fins (fenêtres, branches, coins de
+pièces) ; le taux de contradiction de N=3 est absorbé par
+`--parallel-attempts 8` qui ramène le temps réel à celui d'un seul
+attempt.
+
+### `skyline`, ville nocturne
+
+4 valeurs : ciel noir, immeubles gris, fenêtres jaunes, fondations
+brunes. WFC apprend les motifs de fenêtre dans la maçonnerie, les
+silhouettes verticales et la séparation ciel/sol.
+
+| Input (16×14) | Seed 1 | Seed 7 | Seed 42 |
+|---|---|---|---|
+| ![input](figures/results/inputs/skyline_input.png) | ![1](figures/results/gallery/skyline_seed1.png) | ![7](figures/results/gallery/skyline_seed7.png) | ![42](figures/results/gallery/skyline_seed42.png) |
+
+### `plant`, jardin de fleurs
+
+4 valeurs : ciel bleu pâle, tiges vertes, fleurs jaunes, sol brun.
+Les plantes croissent depuis le sol avec branches et fleurs aux
+extrémités. Plusieurs spécimens dans l'échantillon → variété dans la
+sortie.
+
+| Input (16×15) | Seed 1 | Seed 7 | Seed 42 |
+|---|---|---|---|
+| ![input](figures/results/inputs/plant_input.png) | ![1](figures/results/gallery/plant_seed1.png) | ![7](figures/results/gallery/plant_seed7.png) | ![42](figures/results/gallery/plant_seed42.png) |
+
+### `rooms`, dungeon binaire
+
+2 valeurs : noir (mur), blanc (pièce). Sample contient des pièces
+rectangulaires reliées par couloirs étroits. Sortie : layout de
+dungeon plausible avec pièces de taille variable.
+
+| Input (12×12) | Seed 1 | Seed 7 | Seed 42 |
+|---|---|---|---|
+| ![input](figures/results/inputs/rooms_input.png) | ![1](figures/results/gallery/rooms_seed1.png) | ![7](figures/results/gallery/rooms_seed7.png) | ![42](figures/results/gallery/rooms_seed42.png) |
+
+Le script `scripts/render_gallery.sh` produit les 9 sorties + les 3
+thumbnails d'entrée :
+
+```bash
+./scripts/render_gallery.sh build
+```
+
 ## Effet du déterminisme
 
 Pour un même seed, tous les backends produisent la même grille au bit

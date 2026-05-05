@@ -51,7 +51,15 @@ Grid WFCSolverBase::solve_sequential(const TileSet& tiles,
         Wave wave(opt.rows, opt.cols, rules.num_tiles());
 
         const auto t_solve_start = Clock::now();
-        const bool ok = run_attempt(wave, tiles, rules, seed, rng, stats);
+        // Backtracking is opt-in : it bypasses the backend's parallel
+        // pick / propagate (the snapshot/restore model only makes sense
+        // single-threaded) and invokes the serial backtracking helper
+        // from SolverCommon. The default path (use_backtracking=false)
+        // keeps the original run_attempt → backend dispatch unchanged,
+        // so backends pay no overhead.
+        const bool ok = opt.use_backtracking
+            ? serial_run_attempt_backtrack(wave, tiles, rules, seed, stats)
+            : run_attempt(wave, tiles, rules, seed, rng, stats);
         stats.seconds_solve += std::chrono::duration<double>(
             Clock::now() - t_solve_start).count();
 

@@ -13,7 +13,18 @@ class TileSet {
 public:
     // Extract every N x N pattern from `sample` and aggregate frequencies.
     // Sampling is toroidal (wraps around), so each pixel appears in N*N tiles.
-    static TileSet from_sample(const Grid& sample, int N);
+    //
+    // `symmetries` enables D4 expansion of the tile catalogue :
+    //   1 = no expansion (default, identical to legacy behavior)
+    //   2 = 2 rotations (0°, 180°)
+    //   4 = 4 rotations (0°, 90°, 180°, 270°)
+    //   8 = 4 rotations + 4 reflections (full dihedral group D4)
+    // Each variant inherits its frequency from the source pattern.
+    // Useful for samples with a preferred orientation that you want
+    // applied uniformly in the output (e.g. paths that may turn left
+    // or right). Ignored for tiles that map to themselves under the
+    // chosen symmetry (deduped via the same content hash).
+    static TileSet from_sample(const Grid& sample, int N, int symmetries = 1);
 
     int N() const noexcept { return N_; }
     int size() const noexcept { return static_cast<int>(tiles_.size()); }

@@ -30,6 +30,17 @@ struct SolverOptions {
     // succeed.
     int parallel_attempts = 1;
 
+    // Use backtracking instead of restart-on-contradiction. When false
+    // (default), a contradiction triggers a fresh attempt with a derived
+    // seed. When true, each collapse pushes a decision frame onto a stack
+    // (cell, remaining tile choices, wave snapshot); a contradiction pops
+    // the top frame and tries the next choice. Useful on tightly-
+    // constrained samples where most random seeds run into the same
+    // dead-end; wasteful on easy samples where retry would have succeeded
+    // on attempt 1. Opt-in : the default path is unchanged. Memory cost
+    // ~O(rows*cols*words_per_cell) per stack frame.
+    bool use_backtracking = false;
+
     // Throws std::invalid_argument if any field is out of range.
     void validate() const {
         if (rows < 1)              throw std::invalid_argument("SolverOptions: rows < 1");
